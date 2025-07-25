@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Optional
 import openai
 import base64
 import json
@@ -7,7 +8,7 @@ from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
 
 
-def generate_dalle_image(prompt: str, out_path: Path, client: OpenAI, reference_image: Path | None = None) -> None:
+def generate_dalle_image(prompt: str, out_path: Path, client: OpenAI, reference_image: Optional[Path] = None) -> None:
     """Generate an image using DALL·E 3, with fallback to placeholder."""
     if reference_image and reference_image.exists():
         prompt = (
