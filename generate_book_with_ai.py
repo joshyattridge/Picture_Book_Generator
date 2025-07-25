@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 from typing import Optional
 import openai
+import httpx
 import base64
 import json
 from openai import OpenAI
@@ -19,16 +20,15 @@ def generate_dalle_image(
     try:
         if reference_image and reference_image.exists():
             with reference_image.open("rb") as rf:
-                img_bytes = rf.read()
-            resp = client.images.edit(
-                image=[img_bytes],
-                prompt=prompt,
-                model="gpt-image-1",
-                output_format="jpeg",
-                size="1024x1024",
-                input_fidelity="high",
-                user="picture-book-generator",
-            )
+                resp = client.images.edit(
+                    image=rf,
+                    prompt=prompt,
+                    model="gpt-image-1",
+                    output_format="jpeg",
+                    size="1024x1024",
+                    input_fidelity="high",
+                    user="picture-book-generator",
+                )
         else:
             resp = client.images.generate(
                 prompt=prompt,
@@ -141,7 +141,7 @@ def main() -> None:
     img_dir.mkdir(parents=True, exist_ok=True)
 
     api_key = get_api_key()
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, http_client=httpx.Client())
 
     # Start persistent chat
     messages = [
