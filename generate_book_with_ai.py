@@ -1,10 +1,48 @@
 import os
 from pathlib import Path
+from typing import Optional
 import openai
+import httpx
 import base64
 import json
 from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
+
+
+def generate_dalle_image(
+    prompt: str,
+    out_path: Path,
+    client: OpenAI,
+    reference_image: Optional[Path] = None,
+) -> None:
+    """Generate an image using gpt-image-1, falling back to a placeholder."""
+
+    try:
+        if reference_image and reference_image.exists():
+            with reference_image.open("rb") as rf:
+                resp = client.images.edit(
+                    image=rf,
+                    prompt=prompt,
+                    model="gpt-image-1",
+                    output_format="jpeg",
+                    size="1024x1024",
+                    input_fidelity="high",
+                    user="picture-book-generator",
+                )
+        else:
+            resp = client.images.generate(
+                prompt=prompt,
+                model="gpt-image-1",
+                output_format="jpeg",
+                size="1024x1024",
+                user="picture-book-generator",
+            )
+        img_b64 = resp.data[0].b64_json
+        with open(out_path, "wb") as f:
+            f.write(base64.b64decode(img_b64))
+    except Exception as exc:
+        print(f"Image generation failed: {exc}. Using placeholder.")
+        save_placeholder_image(prompt, out_path)
 
 
 def prompt_user() -> dict:
@@ -80,7 +118,8 @@ def save_placeholder_image(prompt: str, out_path: Path):
         lines.append(line)
     y = 50
     for l in lines:
-        d.text((50, y), l, fill=(0, 0, 0), font=font)
+        safe_text = l.encode("ascii", "replace").decode("ascii")
+        d.text((50, y), safe_text, fill=(0, 0, 0), font=font)
         y += 30
     img.save(out_path)
 
@@ -102,7 +141,7 @@ def main() -> None:
     img_dir.mkdir(parents=True, exist_ok=True)
 
     api_key = get_api_key()
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, http_client=httpx.Client())
 
     # Start persistent chat
     messages = [
@@ -136,7 +175,9 @@ def main() -> None:
     cover_desc = chat_completion(messages, client)
     messages.append({"role": "assistant", "content": cover_desc})
     cover_path = img_dir / "cover.jpg"
-    save_placeholder_image(cover_desc, cover_path)
+    generate_dalle_image(cover_desc, cover_path, client)
+    with cover_path.open("rb") as cf:
+        cover_b64 = base64.b64encode(cf.read()).decode("utf-8")
 
     # Generate page image descriptions referencing the cover for character consistency
     for i, page_text in enumerate(pages, start=1):
@@ -146,10 +187,16 @@ def main() -> None:
             f"LOCKED: main character appearance. Using the provided reference image, maintain visual continuity. "
             f"The text for this page is: {page_text}"
         )
-        messages.append({"role": "user", "content": page_prompt})
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": page_prompt},
+                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{cover_b64}"}},
+            ],
+        })
         page_desc = chat_completion(messages, client)
         messages.append({"role": "assistant", "content": page_desc})
-        save_placeholder_image(page_desc, img_dir / f"page{i}.jpg")
+        generate_dalle_image(page_desc, img_dir / f"page{i}.jpg", client, reference_image=cover_path)
 
     print(f"Generated book content in {book_dir}")
 
