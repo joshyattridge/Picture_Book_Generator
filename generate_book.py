@@ -42,8 +42,12 @@ OUTPUT_PDF = os.path.join(BOOK_PATH, f'{BOOK_NAME}_output.pdf')
 def get_font(size: int) -> ImageFont.FreeTypeFont:
     """Try to load a scalable TrueType font; fall back to the default font.
 
-    DejaVuSans-Bold is commonly available on Linux systems.  If it cannot be
-    found, the default bitmap font is returned.
+    Attempts to load fonts in the following order:
+    1. DejaVuSans-Bold (Linux)
+    2. Arial (Windows/macOS)
+    3. Helvetica (macOS)
+    4. System font paths for macOS
+    5. Default PIL font (not scalable)
 
     Args:
         size: Font size in pixels.
@@ -51,15 +55,22 @@ def get_font(size: int) -> ImageFont.FreeTypeFont:
     Returns:
         A PIL ``ImageFont`` instance.
     """
-    try:
-        return ImageFont.truetype("DejaVuSans-Bold.ttf", size)
-    except Exception:
+    font_paths = [
+        "DejaVuSans-Bold.ttf",  # Linux
+        "Arial.ttf",            # Windows/macOS
+        "Helvetica.ttf",        # macOS
+        "/Library/Fonts/Arial.ttf",  # macOS system path
+        "/Library/Fonts/Helvetica.ttf",  # macOS system path
+        "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS system path
+        "/System/Library/Fonts/Supplemental/Helvetica.ttf",  # macOS system path
+    ]
+    for font_path in font_paths:
         try:
-            # Try a second common font
-            return ImageFont.truetype("arial.ttf", size)
+            return ImageFont.truetype(font_path, size)
         except Exception:
-            # Fallback to the default font (may not be scalable)
-            return ImageFont.load_default()
+            continue
+    # Fallback to the default font (may not be scalable)
+    return ImageFont.load_default()
 
 
 FONT = get_font(FONT_SIZE)
@@ -173,6 +184,12 @@ def generate_book() -> None:
         pages.append(centre_crop_image(img))
         # Text page
         pages.append(create_text_page(paragraph))
+    # Add back cover page if it exists
+    back_cover_path = os.path.join(IMAGES_PATH, 'back.jpg')
+    if os.path.exists(back_cover_path):
+        back_img = Image.open(back_cover_path).convert('RGB')
+        back_page = centre_crop_image(back_img)
+        pages.append(back_page)
     # Ensure output directory exists
     os.makedirs(BOOK_PATH, exist_ok=True)
     # Save the pages as a single PDF
