@@ -16,7 +16,6 @@ def generate_dalle_image(
     reference_image: Optional[Path] = None,
 ) -> None:
     """Generate an image using gpt-image-1, falling back to a placeholder."""
-
     try:
         if reference_image and reference_image.exists():
             with reference_image.open("rb") as rf:
@@ -133,6 +132,7 @@ def chat_completion(messages, client, model="gpt-4o"):
 
 
 def main() -> None:
+    print("\n========== Picture Book Generator ==========")
     info = prompt_user()
 
     # Directory setup
@@ -148,6 +148,7 @@ def main() -> None:
         {"role": "system", "content": "You are a helpful assistant for generating children's books. You will be asked to write stories and describe images for illustration. Always keep the story and illustrations consistent."}
     ]
 
+    print("\n[1/4] Generating story text...")
     # Generate story text
     prose_or_rhyme = "in rhyming verse" if info["book_type"].startswith("r") else "in prose"
     story_prompt = (
@@ -165,6 +166,7 @@ def main() -> None:
     pages = [p.strip() for p in story_text.split("\n\n") if p.strip()]
     (book_dir / "book_text.txt").write_text("\n\n".join(pages), encoding="utf-8")
 
+    print("[2/4] Generating cover image description and image...")
     # Generate cover image description
     cover_prompt = (
         f"Describe a cover illustration for a children's book titled '{info['title']}'. "
@@ -181,8 +183,10 @@ def main() -> None:
     with cover_path.open("rb") as cf:
         cover_b64 = base64.b64encode(cf.read()).decode("utf-8")
 
+    print("[3/4] Generating page images...")
     # Generate page image descriptions referencing the cover for character consistency
     for i, page_text in enumerate(pages, start=1):
+        print(f"    [Page {i}] Generating image description and image...")
         page_prompt = (
             f"Describe an illustration for page {i} of the book '{info['title']}'. "
             f"Use the same style as the cover. {info['style']} "
@@ -202,7 +206,7 @@ def main() -> None:
         messages.append({"role": "assistant", "content": page_desc})
         generate_dalle_image(page_desc, img_dir / f"page{i}.jpg", client, reference_image=cover_path)
 
-    print(f"Generated book content in {book_dir}")
+    print(f"[4/4] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
 
 
 if __name__ == "__main__":
