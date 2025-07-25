@@ -8,20 +8,35 @@ from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
 
 
-def generate_dalle_image(prompt: str, out_path: Path, client: OpenAI, reference_image: Optional[Path] = None) -> None:
-    """Generate an image using DALL·E 3, with fallback to placeholder."""
-    if reference_image and reference_image.exists():
-        prompt = (
-            f"{prompt}\nUse the same characters as shown in the reference image."
-        )
+def generate_dalle_image(
+    prompt: str,
+    out_path: Path,
+    client: OpenAI,
+    reference_image: Optional[Path] = None,
+) -> None:
+    """Generate an image using gpt-image-1, falling back to a placeholder."""
+
     try:
-        resp = client.images.generate(
-            prompt=prompt,
-            model="dall-e-3",
-            response_format="b64_json",
-            size="1024x1024",
-            user="picture-book-generator",
-        )
+        if reference_image and reference_image.exists():
+            with reference_image.open("rb") as rf:
+                img_bytes = rf.read()
+            resp = client.images.edit(
+                image=[img_bytes],
+                prompt=prompt,
+                model="gpt-image-1",
+                response_format="b64_json",
+                size="1024x1024",
+                input_fidelity="high",
+                user="picture-book-generator",
+            )
+        else:
+            resp = client.images.generate(
+                prompt=prompt,
+                model="gpt-image-1",
+                response_format="b64_json",
+                size="1024x1024",
+                user="picture-book-generator",
+            )
         img_b64 = resp.data[0].b64_json
         with open(out_path, "wb") as f:
             f.write(base64.b64decode(img_b64))
