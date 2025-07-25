@@ -24,7 +24,7 @@ def generate_dalle_image(
                 image=[img_bytes],
                 prompt=prompt,
                 model="gpt-image-1",
-                response_format="b64_json",
+                output_format="jpeg",
                 size="1024x1024",
                 input_fidelity="high",
                 user="picture-book-generator",
@@ -33,7 +33,7 @@ def generate_dalle_image(
             resp = client.images.generate(
                 prompt=prompt,
                 model="gpt-image-1",
-                response_format="b64_json",
+                output_format="jpeg",
                 size="1024x1024",
                 user="picture-book-generator",
             )
@@ -118,7 +118,8 @@ def save_placeholder_image(prompt: str, out_path: Path):
         lines.append(line)
     y = 50
     for l in lines:
-        d.text((50, y), l, fill=(0, 0, 0), font=font)
+        safe_text = l.encode("ascii", "replace").decode("ascii")
+        d.text((50, y), safe_text, fill=(0, 0, 0), font=font)
         y += 30
     img.save(out_path)
 
