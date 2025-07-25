@@ -168,7 +168,9 @@ def main() -> None:
     # Generate cover image description
     cover_prompt = (
         f"Describe a cover illustration for a children's book titled '{info['title']}'. "
-        f"Style: {info['style']}. Keep all characters and objects consistent for the rest of the book. "
+        f"The book is about: {info['topic']}. The cover illustration should reflect this subject. "
+        f"Style: {info['style']}. The style, characters, and objects must remain consistent throughout the book. "
+        f"The image must be square. "
         f"LOCKED: main character appearance."
     )
     messages.append({"role": "user", "content": cover_prompt})
@@ -183,7 +185,9 @@ def main() -> None:
     for i, page_text in enumerate(pages, start=1):
         page_prompt = (
             f"Describe an illustration for page {i} of the book '{info['title']}'. "
-            f"Use the same characters and style as the cover. {info['style']} "
+            f"Use the same style as the cover. {info['style']} "
+            f"The style, characters, and objects must remain consistent throughout the book. "
+            f"The image must be square. "
             f"LOCKED: main character appearance. Using the provided reference image, maintain visual continuity. "
             f"The text for this page is: {page_text}"
         )
