@@ -16,6 +16,7 @@ def generate_dalle_image(
     reference_image: Optional[Path] = None,
 ) -> None:
     """Generate an image using gpt-image-1, falling back to a placeholder."""
+
     try:
         if reference_image and reference_image.exists():
             with reference_image.open("rb") as rf:
@@ -24,7 +25,6 @@ def generate_dalle_image(
                     prompt=prompt,
                     model="gpt-image-1",
                     output_format="jpeg",
-                    size="1024x1024",
                     input_fidelity="high",
                     user="picture-book-generator",
                 )
@@ -33,7 +33,6 @@ def generate_dalle_image(
                 prompt=prompt,
                 model="gpt-image-1",
                 output_format="jpeg",
-                size="1024x1024",
                 user="picture-book-generator",
             )
         img_b64 = resp.data[0].b64_json
@@ -162,24 +161,22 @@ def main() -> None:
     )
     messages.append({"role": "user", "content": story_prompt})
     story_text = chat_completion(messages, client)
-    messages.append({"role": "assistant", "content": story_text})
     pages = [p.strip() for p in story_text.split("\n\n") if p.strip()]
     (book_dir / "book_text.txt").write_text("\n\n".join(pages), encoding="utf-8")
 
     print("[2/4] Generating cover image description and image...")
     # Generate cover image description
     cover_prompt = (
-        f"Describe a cover illustration for a children's book titled '{info['title']}'. "
+        f"Create a cover image for a children's book titled '{info['title']}'. "
         f"The book is about: {info['topic']}. The cover illustration should reflect this subject. "
+        f"The story is: {story_text}. "
         f"Style: {info['style']}. The style, characters, and objects must remain consistent throughout the book. "
-        f"The image must be square. "
+        f"The images have to be square no matter what as it will go on a 8.5x8.5 children's book cover."
+        f"no letters ever touch or overflow the edge. "
         f"LOCKED: main character appearance."
     )
-    messages.append({"role": "user", "content": cover_prompt})
-    cover_desc = chat_completion(messages, client)
-    messages.append({"role": "assistant", "content": cover_desc})
     cover_path = img_dir / "cover.jpg"
-    generate_dalle_image(cover_desc, cover_path, client)
+    generate_dalle_image(cover_prompt, cover_path, client)
     with cover_path.open("rb") as cf:
         cover_b64 = base64.b64encode(cf.read()).decode("utf-8")
 
@@ -188,23 +185,16 @@ def main() -> None:
     for i, page_text in enumerate(pages, start=1):
         print(f"    [Page {i}] Generating image description and image...")
         page_prompt = (
-            f"Describe an illustration for page {i} of the book '{info['title']}'. "
+            f"Create an illustration for page {i} of the book '{info['title']}'. "
             f"Use the same style as the cover. {info['style']} "
             f"The style, characters, and objects must remain consistent throughout the book. "
-            f"The image must be square. "
+            f"The image must be square as if it will go in a 8.5x8.5 children's book page. "
+            f"no letters ever touch or overflow the edge. "
             f"LOCKED: main character appearance. Using the provided reference image, maintain visual continuity. "
             f"The text for this page is: {page_text}"
+            f"Please DON'T include any text in the image. as this it printed on a different page."
         )
-        messages.append({
-            "role": "user",
-            "content": [
-                {"type": "text", "text": page_prompt},
-                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{cover_b64}"}},
-            ],
-        })
-        page_desc = chat_completion(messages, client)
-        messages.append({"role": "assistant", "content": page_desc})
-        generate_dalle_image(page_desc, img_dir / f"page{i}.jpg", client, reference_image=cover_path)
+        generate_dalle_image(page_prompt, img_dir / f"page{i}.jpg", client, reference_image=cover_path)
 
     print(f"[4/4] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
 
