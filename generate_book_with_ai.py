@@ -180,6 +180,18 @@ def main() -> None:
     with cover_path.open("rb") as cf:
         cover_b64 = base64.b64encode(cf.read()).decode("utf-8")
 
+    # Generate back cover image
+    print("[2.5/4] Generating back cover image...")
+    back_cover_prompt = (
+        f"Create a square illustration of the main element from the children's book titled '{info['title']}'. "
+        f"The main element may be the main character or a central object, as appropriate for the story. "
+        f"The image should be visually appealing, centered, and match the style and theme of the book. "
+        f"Style: {info['style']}. The image must be square as if it will go on a 8.5x8.5 children's book back cover. "
+        f"Do not include any letters or text."
+    )
+    back_cover_path = img_dir / "back.jpg"
+    generate_dalle_image(back_cover_prompt, back_cover_path, client, reference_image=cover_path)
+
     print("[3/4] Generating page images...")
     # Generate page image descriptions referencing the cover for character consistency
     for i, page_text in enumerate(pages, start=1):
