@@ -77,56 +77,63 @@ FONT = get_font(FONT_SIZE)
 
 
 def wrap_text(text: str, draw: ImageDraw.Draw, font: ImageFont.ImageFont, max_width: float) -> list[str]:
-    """Split text into a list of lines that fit within a given width.
-
-    Args:
-        text: The raw paragraph to wrap.
-        draw: An ``ImageDraw`` instance used to measure text.
-        font: The font used for measurement.
-        max_width: Maximum width for each line in pixels.
-
-    Returns:
-        A list of strings, each representing a line of wrapped text.
-    """
-    words = text.split()
-    lines: list[str] = []
-    current = ''
-    for word in words:
-        test = f'{current} {word}'.strip()
-        w, _ = draw.textsize(test, font=font)
-        if w > max_width and current:
-            lines.append(current)
-            current = word
-        else:
-            current = test
-    if current:
-        lines.append(current)
-    return lines
+    """Split text into a list of lines that fit within a given width, preserving explicit newlines."""
+    # Split the text into lines using explicit newlines
+    raw_lines = text.split('\n')
+    wrapped_lines: list[str] = []
+    for raw_line in raw_lines:
+        if not raw_line.strip():
+            # Preserve empty lines
+            wrapped_lines.append("")
+            continue
+        words = raw_line.split()
+        current = ''
+        for word in words:
+            test = f'{current} {word}'.strip()
+            w, _ = draw.textsize(test, font=font)
+            if w > max_width and current:
+                wrapped_lines.append(current)
+                current = word
+            else:
+                current = test
+        if current:
+            wrapped_lines.append(current)
+    return wrapped_lines
 
 
 def create_text_page(paragraph: str) -> Image.Image:
-    """Create a white page with centred, wrapped text for a given paragraph.
-
-    Args:
-        paragraph: The paragraph to render.
-
-    Returns:
-        A PIL ``Image`` representing the page.
-    """
+    """Create a white page with centred, wrapped text for a given paragraph, preserving explicit newlines and auto-scaling font size to fit."""
+    min_font_size = 24
+    font_size = FONT_SIZE
+    max_width = PAGE_SIZE[0] - 2 * MARGIN
     img = Image.new('RGB', (int(PAGE_SIZE[0]), int(PAGE_SIZE[1])), (255, 255, 255))
     draw = ImageDraw.Draw(img)
-    max_width = PAGE_SIZE[0] - 2 * MARGIN
-    lines = wrap_text(paragraph, draw, FONT, max_width)
-    # Compute total height of the block of text (line height plus spacing)
-    line_height = FONT.getsize('Ag')[1]
-    spacing = 20  # space between lines
-    total_height = line_height * len(lines) + spacing * (len(lines) - 1)
-    # Start drawing so the block is vertically centred
+
+    while font_size >= min_font_size:
+        font = get_font(font_size)
+        lines = wrap_text(paragraph, draw, font, max_width)
+        line_height = font.getsize('Ag')[1]
+        spacing = 10
+        total_height = line_height * len(lines) + spacing * (len(lines) - 1)
+        if total_height <= PAGE_SIZE[1] - 2 * MARGIN:
+            break
+        font_size -= 2  # Decrease font size and try again
+    else:
+        # If we exit the loop without breaking, use the minimum font size
+        font = get_font(min_font_size)
+        lines = wrap_text(paragraph, draw, font, max_width)
+        line_height = font.getsize('Ag')[1]
+        spacing = 10
+        total_height = line_height * len(lines) + spacing * (len(lines) - 1)
+
     y = (PAGE_SIZE[1] - total_height) // 2
     for line in lines:
-        w, _ = draw.textsize(line, font=FONT)
+        if line == "":
+            y += line_height + spacing
+            continue
+        w, _ = draw.textsize(line, font=font)
         x = (PAGE_SIZE[0] - w) // 2
-        draw.text((x, y), line, font=FONT, fill=(0, 0, 0))
+        draw.text((x, y), line, font=font, fill=(0, 0, 0))
         y += line_height + spacing
     return img
 
@@ -162,40 +169,61 @@ def centre_crop_image(img: Image.Image) -> Image.Image:
     return crop
 
 
-def generate_book() -> None:
-    """Generate the picture book PDF from the configured book folder."""
+def generate_book(book_name: str) -> None:
+    """Generate the picture book PDF for a given book folder."""
+    book_path = os.path.join(BOOKS_DIR, book_name)
+    images_path = os.path.join(book_path, 'images')
+    text_path = os.path.join(book_path, 'book_text.txt')
+    output_pdf = os.path.join(book_path, f'{book_name}_output.pdf')
     # Read paragraphs from the text file
-    with open(TEXT_PATH, 'r', encoding='utf-8') as f:
+    if not os.path.exists(text_path):
+        print(f"[SKIP] No book_text.txt found for {book_name}")
+        return
+    with open(text_path, 'r', encoding='utf-8') as f:
         content = f.read()
     paragraphs = [p.strip() for p in content.split('\n\n') if p.strip()]
     # Prepare list of image paths: cover plus one per paragraph
-    image_files: list[str] = [os.path.join(IMAGES_PATH, 'cover.jpg')]
+    image_files: list[str] = [os.path.join(images_path, 'cover.jpg')]
     for i in range(1, len(paragraphs) + 1):
-        image_files.append(os.path.join(IMAGES_PATH, f'page{i}.jpg'))
+        image_files.append(os.path.join(images_path, f'page{i}.jpg'))
     pages: list[Image.Image] = []
     # Create cover page
+    if not os.path.exists(image_files[0]):
+        print(f"[SKIP] No cover.jpg found for {book_name}")
+        return
     cover_img = Image.open(image_files[0]).convert('RGB')
     cover_page = centre_crop_image(cover_img)
     pages.append(cover_page)
     # Create pages for each paragraph
     for idx, paragraph in enumerate(paragraphs):
-        # Illustration page
-        img = Image.open(image_files[idx + 1]).convert('RGB')
+        img_path = image_files[idx + 1]
+        if not os.path.exists(img_path):
+            print(f"[SKIP] No image for page {idx+1} in {book_name}")
+            return
+        img = Image.open(img_path).convert('RGB')
         pages.append(centre_crop_image(img))
-        # Text page
         pages.append(create_text_page(paragraph))
     # Add back cover page if it exists
-    back_cover_path = os.path.join(IMAGES_PATH, 'back.jpg')
+    back_cover_path = os.path.join(images_path, 'back.jpg')
     if os.path.exists(back_cover_path):
         back_img = Image.open(back_cover_path).convert('RGB')
         back_page = centre_crop_image(back_img)
         pages.append(back_page)
     # Ensure output directory exists
-    os.makedirs(BOOK_PATH, exist_ok=True)
+    os.makedirs(book_path, exist_ok=True)
     # Save the pages as a single PDF
-    pages[0].save(OUTPUT_PDF, save_all=True, append_images=pages[1:])
-    print(f'PDF generated at {OUTPUT_PDF}')
+    pages[0].save(output_pdf, save_all=True, append_images=pages[1:])
+    print(f'PDF generated at {output_pdf}')
+
+
+def main():
+    # Loop through all subdirectories in books/
+    for book_name in os.listdir(BOOKS_DIR):
+        book_path = os.path.join(BOOKS_DIR, book_name)
+        if os.path.isdir(book_path):
+            print(f'Generating book for: {book_name}')
+            generate_book(book_name)
 
 
 if __name__ == '__main__':
-    generate_book()
+    main()
