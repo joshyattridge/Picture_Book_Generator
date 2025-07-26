@@ -66,7 +66,18 @@ def prompt_user() -> dict:
     if not info:
         title = input("Book title: ")
         topic = input("What is the book about? ")
-        pages = int(input("Number of pages (excluding cover): "))
+        
+        # Validate page count - minimum 12 pages
+        while True:
+            try:
+                pages = int(input("Number of pages (excluding cover, minimum 12): "))
+                if pages < 12:
+                    print("Error: Minimum number of pages is 12. Please enter 12 or more pages.")
+                    continue
+                break
+            except ValueError:
+                print("Error: Please enter a valid number (minimum 12 pages).")
+        
         book_type = input("Story book or rhyming book? (story/rhyme): ")
         style = input("Preferred drawing style: ")
         info = {
@@ -148,7 +159,8 @@ def main() -> None:
     ]
 
     print("\n[1/4] Generating story text...")
-    # Generate story text
+    
+    # Generate story text with feedback loop
     prose_or_rhyme = "in rhyming verse" if info["book_type"].startswith("r") else "in prose"
     story_prompt = (
         f"Write a {info['pages']}-page children's book {prose_or_rhyme}. "
@@ -159,9 +171,52 @@ def main() -> None:
         f"Separate each paragraph with a single blank line. "
         f"The output should be ready to save to a text file, with each page's text as a paragraph separated by a blank line."
     )
-    messages.append({"role": "user", "content": story_prompt})
-    story_text = chat_completion(messages, client)
-    pages = [p.strip() for p in story_text.split("\n\n") if p.strip()]
+    
+    story_satisfied = False
+    while not story_satisfied:
+        messages.append({"role": "user", "content": story_prompt})
+        story_text = chat_completion(messages, client)
+        pages = [p.strip() for p in story_text.split("\n\n") if p.strip()]
+        
+        # Check if the generated story has the correct number of pages
+        if len(pages) != info['pages']:
+            print(f"\nError: Generated story has {len(pages)} pages, but {info['pages']} pages were requested.")
+            print("Regenerating story with correct page count...")
+            continue
+        
+        # Display the generated story
+        print("\n" + "="*50)
+        print("GENERATED STORY:")
+        print("="*50)
+        for i, page in enumerate(pages, 1):
+            print(f"\nPage {i}:")
+            print(page)
+        print("="*50)
+        
+        # Ask for feedback
+        feedback = input("\nAre you happy with this story? (yes/no): ").strip().lower()
+        if feedback in ['yes', 'y', '']:
+            story_satisfied = True
+            print("Great! Continuing with story generation...")
+        else:
+            user_feedback = input("Please provide feedback for improvements: ").strip()
+            if user_feedback:
+                # Add feedback to the prompt for the next iteration
+                story_prompt = (
+                    f"Write a {info['pages']}-page children's book {prose_or_rhyme}. "
+                    f"The title is '{info['title']}'. "
+                    f"It is about {info['topic']}. "
+                    f"Output exactly {info['pages']} paragraphs, one for each page, in order. "
+                    f"Do not include any page numbers, headers, or extra text. "
+                    f"Separate each paragraph with a single blank line. "
+                    f"The output should be ready to save to a text file, with each page's text as a paragraph separated by a blank line. "
+                    f"IMPORTANT FEEDBACK TO INCORPORATE: {user_feedback}"
+                )
+                print("Regenerating story with your feedback...")
+            else:
+                print("No feedback provided, regenerating story...")
+    
+    # Save the final story
     (book_dir / "book_text.txt").write_text("\n\n".join(pages), encoding="utf-8")
 
     print("[2/4] Generating cover image description and image...")
@@ -193,11 +248,27 @@ def main() -> None:
     generate_dalle_image(back_cover_prompt, back_cover_path, client, reference_image=cover_path)
 
     print("[3/4] Generating page images...")
-    # Generate page image descriptions referencing the cover for character consistency
+    
+    # Generate title page (page 1) first
+    print("    [Page 1] Generating title page...")
+    title_page_prompt = (
+        f"Create a title page illustration for the children's book '{info['title']}'. "
+        f"This is page 1 - a simple, elegant title page. "
+        f"Show the main subject/character from the story in the center of the image. "
+        f"Below the main subject, include the book title '{info['title']}' in large, clear text. "
+        f"Use the same style as the cover: {info['style']}. "
+        f"The style and main character appearance must remain consistent with the cover. "
+        f"The image must be square as if it will go in a 8.5x8.5 children's book page. "
+        f"Make it clean and simple - just the main subject and title text. "
+        f"Using the provided reference image, maintain visual continuity for the main character."
+    )
+    generate_dalle_image(title_page_prompt, img_dir / "page1.jpg", client, reference_image=cover_path)
+    
+    # Generate story pages (starting from page 2)
     for i, page_text in enumerate(pages, start=1):
-        print(f"    [Page {i}] Generating image description and image...")
+        print(f"    [Page {i+1}] Generating image description and image...")
         page_prompt = (
-            f"Create an illustration for page {i} of the book '{info['title']}'. "
+            f"Create an illustration for page {i+1} of the book '{info['title']}'. "
             f"Use the same style as the cover. {info['style']} "
             f"The style, characters, and objects must remain consistent throughout the book. "
             f"The image must be square as if it will go in a 8.5x8.5 children's book page. "
@@ -206,7 +277,7 @@ def main() -> None:
             f"The text for this page is: {page_text}"
             f"Please DON'T include any text in the image. as this it printed on a different page."
         )
-        generate_dalle_image(page_prompt, img_dir / f"page{i}.jpg", client, reference_image=cover_path)
+        generate_dalle_image(page_prompt, img_dir / f"page{i+1}.jpg", client, reference_image=cover_path)
 
     print(f"[4/4] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
 
