@@ -414,22 +414,44 @@ def get_title_from_name(book_name: str) -> str:
     return ''.join(spaced)
 
 
-def create_cover_page(cover_img: Image.Image, book_name: str) -> Image.Image:
-    """Prepare the front cover image.
+def create_cover_page(cover_img: Image.Image, title: str) -> Image.Image:
+    """Prepare the front cover image with the book title overlaid.
 
-    The provided image is centre‑cropped to a square to match the page size.
-    No additional title or decorations are drawn so that the artwork can
-    contain its own text if desired.
+    The image is centre‑cropped to the page size and a semi‑transparent
+    panel containing ``title`` is drawn near the bottom.  The text is kept
+    well inside the safe area so it won't be trimmed when printed.
 
     Args:
         cover_img: Source PIL image for the cover.
-        book_name: Name of the book directory (unused but kept for
-            compatibility with earlier versions).
+        title: Full book title to render on the front cover.
 
     Returns:
-        A PIL ``Image`` representing the cover page.
+        A PIL ``Image`` representing the decorated cover page.
     """
-    return centre_crop_image(cover_img)
+    img = centre_crop_image(cover_img).convert("RGBA")
+
+    draw = ImageDraw.Draw(img)
+    # Safe margin of 0.25" to keep text away from the trim line
+    margin = int(0.25 * INCH)
+    font_size = int(INCH * 0.3)
+    font = get_heading_font(font_size)
+    bbox = draw.textbbox((0, 0), title, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    rect = (
+        margin,
+        img.height - text_h - margin * 1.5,
+        img.width - margin,
+        img.height - margin * 0.5,
+    )
+    panel = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    pdraw = ImageDraw.Draw(panel)
+    pdraw.rectangle(rect, fill=(255, 255, 255, 220))
+    text_x = (img.width - text_w) // 2
+    text_y = rect[1] + (rect[3] - rect[1] - text_h) // 2
+    pdraw.text((text_x, text_y), title, font=font, fill=(0, 0, 0, 255))
+    img = Image.alpha_composite(img, panel)
+    return img.convert("RGB")
 
 
 # KDP-required cover size for 8.5 x 8.5 in book (with bleed):
@@ -461,9 +483,10 @@ def generate_book(book_name: str) -> None:
     # Load cover and back cover images if they exist
     cover_img = None
     back_img = None
+    title = get_title_from_name(book_name)
     if os.path.exists(image_files[0]):
-        cover_img = Image.open(image_files[0]).convert('RGB')
-        cover_page = create_cover_page(cover_img, book_name)
+        cover_img = Image.open(image_files[0]).convert("RGB")
+        cover_page = create_cover_page(cover_img, title)
     else:
         print(f"[SKIP] No cover.jpg found for {book_name}")
         return
@@ -497,9 +520,30 @@ def generate_book(book_name: str) -> None:
 
     back_resized = fill_crop(back_page, half_width, height)
     cover_resized = fill_crop(cover_page, half_width, height)
-    # Place the front cover on the left and the back cover on the right
-    cover_spread.paste(cover_resized, (0, 0))
-    cover_spread.paste(back_resized, (half_width, 0))
+    # Place the back cover on the left and the front cover on the right
+    cover_spread.paste(back_resized, (0, 0))
+    cover_spread.paste(cover_resized, (half_width, 0))
+
+    # Add spine text if the book is thick enough
+    page_count = len(paragraphs) * 2
+    if page_count >= 100:
+        spine_width_in = 0.002252 * page_count
+        spine_w = int(spine_width_in * DPI)
+        spine_x = half_width - spine_w // 2
+        spine = Image.new("RGBA", cover_spread.size, (0, 0, 0, 0))
+        font = get_heading_font(int(INCH * 0.2))
+        text = title
+        text_img = Image.new("RGBA", (spine_w, height), (0, 0, 0, 0))
+        tdraw = ImageDraw.Draw(text_img)
+        text_bbox = tdraw.textbbox((0, 0), text, font=font)
+        tw = text_bbox[2] - text_bbox[0]
+        th = text_bbox[3] - text_bbox[1]
+        tx = (spine_w - tw) // 2
+        ty = (height - th) // 2
+        tdraw.text((tx, ty), text, font=font, fill=(0, 0, 0, 255))
+        rotated = text_img.rotate(90, expand=True)
+        spine.paste(rotated, (spine_x, 0), rotated)
+        cover_spread = Image.alpha_composite(cover_spread.convert("RGBA"), spine).convert("RGB")
     # Save the cover spread as a PDF
     cover_spread.save(cover_pdf, "PDF", resolution=300.0)
     print(f'Cover PDF generated at {cover_pdf}')
