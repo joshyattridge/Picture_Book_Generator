@@ -406,44 +406,21 @@ def get_title_from_name(book_name: str) -> str:
 
 
 def create_cover_page(cover_img: Image.Image, book_name: str) -> Image.Image:
-    """Create an enhanced cover page.
+    """Prepare the front cover image.
 
-    This function centre‑crops the provided image to square dimensions and
-    overlays a semi‑transparent panel near the bottom containing the book
-    title.  The title is derived from the directory name and uses a larger
-    heading font.  If the underlying image is dark, the light panel ensures
-    the text remains legible.
+    The provided image is centre‑cropped to a square to match the page size.
+    No additional title or decorations are drawn so that the artwork can
+    contain its own text if desired.
 
     Args:
         cover_img: Source PIL image for the cover.
-        book_name: Name of the book directory.
+        book_name: Name of the book directory (unused but kept for
+            compatibility with earlier versions).
 
     Returns:
-        A PIL ``Image`` representing the decorated cover page.
+        A PIL ``Image`` representing the cover page.
     """
-    # Crop the source image to a square first
-    base = centre_crop_image(cover_img)
-
-    # Derive a human‑readable title from the folder name
-    title = get_title_from_name(book_name)
-    draw = ImageDraw.Draw(base)
-
-    # Draw a semi‑transparent panel near the bottom for the title text
-    panel_height = int(base.height * 0.15)
-    panel = Image.new("RGBA", (base.width, panel_height), (255, 255, 255, 180))
-    base.paste(panel, (0, base.height - panel_height), panel)
-
-    # Render the title centred in the panel
-    font_size = int(base.height * 0.07)
-    font = get_heading_font(font_size)
-    bbox = draw.textbbox((0, 0), title, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    x = (base.width - text_w) // 2
-    y = base.height - panel_height + (panel_height - text_h) // 2
-    draw.text((x, y), title, font=font, fill=(0, 0, 0))
-
-    return base
+    return centre_crop_image(cover_img)
 
 
 # KDP-required cover size for 8.5 x 8.5 in book (with bleed):
@@ -511,8 +488,9 @@ def generate_book(book_name: str) -> None:
 
     back_resized = fill_crop(back_page, half_width, height)
     cover_resized = fill_crop(cover_page, half_width, height)
-    cover_spread.paste(back_resized, (0, 0))
-    cover_spread.paste(cover_resized, (half_width, 0))
+    # Place the front cover on the left and the back cover on the right
+    cover_spread.paste(cover_resized, (0, 0))
+    cover_spread.paste(back_resized, (half_width, 0))
     # Save the cover spread as a PDF
     cover_spread.save(cover_pdf, "PDF", resolution=300.0)
     print(f'Cover PDF generated at {cover_pdf}')
@@ -551,5 +529,5 @@ def main():
             generate_book(book_name)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
