@@ -375,18 +375,18 @@ def centre_crop_image(img: Image.Image) -> Image.Image:
     page_ratio = PAGE_SIZE[0] / PAGE_SIZE[1]
     if img_ratio > page_ratio:
         # Image is wider than page: scale height to match, crop width
-        new_height = int(PAGE_SIZE[1])
-        new_width = int(new_height * img_ratio)
+        new_height = int(round(PAGE_SIZE[1]))
+        new_width = int(round(new_height * img_ratio))
         resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        left = (new_width - PAGE_SIZE[0]) // 2
-        crop = resized.crop((left, 0, left + int(PAGE_SIZE[0]), int(PAGE_SIZE[1])))
+        left = int(round((new_width - PAGE_SIZE[0]) / 2))
+        crop = resized.crop((left, 0, left + int(round(PAGE_SIZE[0])), int(round(PAGE_SIZE[1]))))
     else:
         # Image is taller than page: scale width to match, crop height
-        new_width = int(PAGE_SIZE[0])
-        new_height = int(new_width / img_ratio)
+        new_width = int(round(PAGE_SIZE[0]))
+        new_height = int(round(new_width / img_ratio))
         resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        top = (new_height - PAGE_SIZE[1]) // 2
-        crop = resized.crop((0, top, int(PAGE_SIZE[0]), top + int(PAGE_SIZE[1])))
+        top = int(round((new_height - PAGE_SIZE[1]) / 2))
+        crop = resized.crop((0, top, int(round(PAGE_SIZE[0])), top + int(round(PAGE_SIZE[1]))))
     return crop
 
 
@@ -438,7 +438,10 @@ def create_cover_page(cover_img: Image.Image, title: str) -> Image.Image:
 COVER_WIDTH_INCHES = 17.306
 COVER_HEIGHT_INCHES = 8.750
 DPI = 300
-COVER_SIZE = (int(COVER_WIDTH_INCHES * DPI), int(COVER_HEIGHT_INCHES * DPI))  # (5192, 2625)
+COVER_SIZE = (
+    int(round(COVER_WIDTH_INCHES * DPI)),
+    int(round(COVER_HEIGHT_INCHES * DPI)),
+)
 
 
 def generate_book(book_name: str) -> None:
@@ -494,8 +497,8 @@ def generate_book(book_name: str) -> None:
             new_w = target_w
             new_h = int(new_w / ratio)
         resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-        left = (new_w - target_w) // 2
-        top = (new_h - target_h) // 2
+        left = int(round((new_w - target_w) / 2))
+        top = int(round((new_h - target_h) / 2))
         return resized.crop((left, top, left + target_w, top + target_h))
 
     back_resized = fill_crop(back_page, half_width, height)
