@@ -18,7 +18,7 @@ stored in ``books/MyBook/images``.  The output PDF will be written to
 """
 
 import os
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import math
 
 # Constants for an 8.5×8.5 inch square book at 300 dpi
@@ -371,23 +371,12 @@ def centre_crop_image(img: Image.Image) -> Image.Image:
     Returns:
         A new ``Image`` object of size ``PAGE_SIZE``.
     """
-    img_ratio = img.width / img.height
-    page_ratio = PAGE_SIZE[0] / PAGE_SIZE[1]
-    if img_ratio > page_ratio:
-        # Image is wider than page: scale height to match, crop width
-        new_height = int(round(PAGE_SIZE[1]))
-        new_width = int(round(new_height * img_ratio))
-        resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        left = int(round((new_width - PAGE_SIZE[0]) / 2))
-        crop = resized.crop((left, 0, left + int(round(PAGE_SIZE[0])), int(round(PAGE_SIZE[1]))))
-    else:
-        # Image is taller than page: scale width to match, crop height
-        new_width = int(round(PAGE_SIZE[0]))
-        new_height = int(round(new_width / img_ratio))
-        resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        top = int(round((new_height - PAGE_SIZE[1]) / 2))
-        crop = resized.crop((0, top, int(round(PAGE_SIZE[0])), top + int(round(PAGE_SIZE[1]))))
-    return crop
+    # ``ImageOps.fit`` handles the scaling and cropping in one step using
+    # floating‑point math internally, which avoids tiny rounding errors that can
+    # leave stray borders.  The resulting image is guaranteed to match
+    # ``PAGE_SIZE`` exactly.
+    size = (int(round(PAGE_SIZE[0])), int(round(PAGE_SIZE[1])))
+    return ImageOps.fit(img, size, Image.Resampling.LANCZOS, centering=(0.5, 0.5))
 
 
 def get_title_from_name(book_name: str) -> str:
@@ -488,18 +477,9 @@ def generate_book(book_name: str) -> None:
     # Resize and centre crop images so they completely fill each half of the
     # spread.  This ensures the artwork extends into the bleed area.
     def fill_crop(img, target_w, target_h):
-        ratio = img.width / img.height
-        target_ratio = target_w / target_h
-        if ratio > target_ratio:
-            new_h = target_h
-            new_w = int(new_h * ratio)
-        else:
-            new_w = target_w
-            new_h = int(new_w / ratio)
-        resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-        left = int(round((new_w - target_w) / 2))
-        top = int(round((new_h - target_h) / 2))
-        return resized.crop((left, top, left + target_w, top + target_h))
+        """Resize and crop an image so it completely fills ``target_w``×``target_h``."""
+        size = (int(target_w), int(target_h))
+        return ImageOps.fit(img, size, Image.Resampling.LANCZOS, centering=(0.5, 0.5))
 
     back_resized = fill_crop(back_page, half_width, height)
     cover_resized = fill_crop(cover_page, half_width, height)
