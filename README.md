@@ -1,6 +1,6 @@
 # Children's Book PDF Generator
 
-This project is a simple PDF children's book generator. It allows you to provide a list of text paragraphs and images, and generates a PDF where each page contains one paragraph and one image. The generated PDF is formatted to be 8.5x8.5 inches, making it suitable for uploading to Kindle Direct Publishing (KDP).
+This project is a simple PDF children's book generator. It allows you to provide a list of text paragraphs and images, and generates a PDF where each page contains one paragraph and one image. The generated PDF is formatted for an 8.5×8.5 inch book at **300 dpi**, making it suitable for uploading to Kindle Direct Publishing (KDP).
 
 ## Features
 
@@ -56,7 +56,8 @@ generate_book(texts, images, output_pdf="childrens_book.pdf")
 
 ## KDP Compatibility
 
-- The output PDF is sized at 8.5x8.5 inches, which is compatible with KDP's requirements for square children's books.
+- The generated PDFs use 300 dpi pages measuring 8.5×8.5 inches.
+- Cover images are automatically expanded to include bleed and the front cover now displays the book title.
 - Please review KDP's latest guidelines for any additional requirements before uploading.
 
 ## License

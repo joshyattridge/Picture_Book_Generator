@@ -21,15 +21,17 @@ import os
 from PIL import Image, ImageDraw, ImageFont
 import math
 
-# Constants for an 8.5×8.5‑inch square book at 300 dpi
-INCH = 75
-# Define the finished page dimensions in pixels for an 8.5×8.5 inch book
+# Constants for an 8.5×8.5 inch square book at 300 dpi
+# Use 300 pixels per inch so that the output PDF meets KDP’s resolution
+# requirements.
+INCH = 300
+# Define the finished page dimensions in pixels (2550 × 2550 pixels).
 PAGE_SIZE = (8.5 * INCH, 8.5 * INCH)
 
-# Margin around text content (in pixels).  This is used to inset the text
-# panel from the edge of the page to avoid cramped layouts.  It will also
-# control space for decorative borders and page numbers.
-MARGIN = 35
+# Margin around text content (in pixels). KDP requires at least 0.25″
+# (6.35 mm) on the outside, or 0.375″ when using bleed.  We opt for the
+# larger value to ensure nothing is trimmed.
+MARGIN = int(0.375 * INCH)
 
 # Base font size for body text.  This value will be scaled down if the
 # paragraph is too long to comfortably fit within the available area.  A
@@ -419,12 +421,29 @@ def create_cover_page(cover_img: Image.Image, book_name: str) -> Image.Image:
     Returns:
         A PIL ``Image`` representing the decorated cover page.
     """
-    # Simply centre‑crop the cover image.  We intentionally avoid overlaying
-    # text here because many cover images will contain their own titles or
-    # artwork.  By refraining from adding additional elements we maintain
-    # flexibility across a variety of books.  Page numbers are handled
-    # separately by the calling code and are not drawn on the cover.
-    return centre_crop_image(cover_img)
+    # Crop the source image to a square first
+    base = centre_crop_image(cover_img)
+
+    # Derive a human‑readable title from the folder name
+    title = get_title_from_name(book_name)
+    draw = ImageDraw.Draw(base)
+
+    # Draw a semi‑transparent panel near the bottom for the title text
+    panel_height = int(base.height * 0.15)
+    panel = Image.new("RGBA", (base.width, panel_height), (255, 255, 255, 180))
+    base.paste(panel, (0, base.height - panel_height), panel)
+
+    # Render the title centred in the panel
+    font_size = int(base.height * 0.07)
+    font = get_heading_font(font_size)
+    bbox = draw.textbbox((0, 0), title, font=font)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    x = (base.width - text_w) // 2
+    y = base.height - panel_height + (panel_height - text_h) // 2
+    draw.text((x, y), title, font=font, fill=(0, 0, 0))
+
+    return base
 
 
 # KDP-required cover size for 8.5 x 8.5 in book (with bleed):
@@ -474,28 +493,26 @@ def generate_book(book_name: str) -> None:
     cover_spread = Image.new('RGB', COVER_SIZE, (255, 255, 255))
     half_width = COVER_SIZE[0] // 2
     height = COVER_SIZE[1]
-    # Resize cover and back to fit half the width and full height, maintaining aspect ratio
-    def resize_to_fit(img, target_w, target_h):
-        img_ratio = img.width / img.height
+    # Resize and centre crop images so they completely fill each half of the
+    # spread.  This ensures the artwork extends into the bleed area.
+    def fill_crop(img, target_w, target_h):
+        ratio = img.width / img.height
         target_ratio = target_w / target_h
-        if img_ratio > target_ratio:
-            # Image is wider than target: fit width
-            new_w = target_w
-            new_h = int(target_w / img_ratio)
-        else:
-            # Image is taller than target: fit height
+        if ratio > target_ratio:
             new_h = target_h
-            new_w = int(target_h * img_ratio)
-        return img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-    back_resized = resize_to_fit(back_page, half_width, height)
-    cover_resized = resize_to_fit(cover_page, half_width, height)
-    # Center images if not exact fit
-    cover_x = (half_width - cover_resized.width) // 2
-    cover_y = (height - cover_resized.height) // 2
-    back_x = half_width + (half_width - back_resized.width) // 2
-    back_y = (height - back_resized.height) // 2
-    cover_spread.paste(cover_resized, (cover_x, cover_y))
-    cover_spread.paste(back_resized, (back_x, back_y))
+            new_w = int(new_h * ratio)
+        else:
+            new_w = target_w
+            new_h = int(new_w / ratio)
+        resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        left = (new_w - target_w) // 2
+        top = (new_h - target_h) // 2
+        return resized.crop((left, top, left + target_w, top + target_h))
+
+    back_resized = fill_crop(back_page, half_width, height)
+    cover_resized = fill_crop(cover_page, half_width, height)
+    cover_spread.paste(back_resized, (0, 0))
+    cover_spread.paste(cover_resized, (half_width, 0))
     # Save the cover spread as a PDF
     cover_spread.save(cover_pdf, "PDF", resolution=300.0)
     print(f'Cover PDF generated at {cover_pdf}')
