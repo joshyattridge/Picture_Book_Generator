@@ -415,11 +415,12 @@ def get_title_from_name(book_name: str) -> str:
 
 
 def create_cover_page(cover_img: Image.Image, title: str) -> Image.Image:
-    """Prepare the front cover image with the book title overlaid.
+    """Prepare the front cover image without adding any text.
 
-    The image is centre‑cropped to the page size and a semi‑transparent
-    panel containing ``title`` is drawn near the bottom.  The text is kept
-    well inside the safe area so it won't be trimmed when printed.
+    The image is centre‑cropped to the page size so that it fills the
+    bleed area on all sides.  No additional title overlay is applied
+    because many cover designs already include the book title within
+    the artwork.
 
     Args:
         cover_img: Source PIL image for the cover.
@@ -428,30 +429,9 @@ def create_cover_page(cover_img: Image.Image, title: str) -> Image.Image:
     Returns:
         A PIL ``Image`` representing the decorated cover page.
     """
-    img = centre_crop_image(cover_img).convert("RGBA")
-
-    draw = ImageDraw.Draw(img)
-    # Safe margin of 0.25" to keep text away from the trim line
-    margin = int(0.25 * INCH)
-    font_size = int(INCH * 0.3)
-    font = get_heading_font(font_size)
-    bbox = draw.textbbox((0, 0), title, font=font)
-    text_w = bbox[2] - bbox[0]
-    text_h = bbox[3] - bbox[1]
-    rect = (
-        margin,
-        img.height - text_h - margin * 1.5,
-        img.width - margin,
-        img.height - margin * 0.5,
-    )
-    panel = Image.new("RGBA", img.size, (0, 0, 0, 0))
-    pdraw = ImageDraw.Draw(panel)
-    pdraw.rectangle(rect, fill=(255, 255, 255, 220))
-    text_x = (img.width - text_w) // 2
-    text_y = rect[1] + (rect[3] - rect[1] - text_h) // 2
-    pdraw.text((text_x, text_y), title, font=font, fill=(0, 0, 0, 255))
-    img = Image.alpha_composite(img, panel)
-    return img.convert("RGB")
+    # Simply centre‑crop the provided image and return it. The caller is
+    # responsible for adding any spine text when needed.
+    return centre_crop_image(cover_img)
 
 
 # KDP-required cover size for 8.5 x 8.5 in book (with bleed):
