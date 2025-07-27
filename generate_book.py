@@ -523,7 +523,12 @@ def generate_book(book_name: str) -> None:
         pages.append(create_text_page(paragraph, page_idx))
     # Save the manuscript PDF (interior pages only)
     if pages:
-        pages[0].save(output_pdf, save_all=True, append_images=pages[1:])
+        pages[0].save(
+            output_pdf,
+            save_all=True,
+            append_images=pages[1:],
+            resolution=300.0,
+        )
         print(f'Manuscript PDF generated at {output_pdf}')
     else:
         print(f"[SKIP] No interior pages generated for {book_name}")

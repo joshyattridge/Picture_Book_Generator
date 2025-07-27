@@ -57,7 +57,7 @@ generate_book(texts, images, output_pdf="childrens_book.pdf")
 ## KDP Compatibility
 
 - The generated PDFs use 300 dpi pages measuring 8.5×8.5 inches.
-- Cover images are automatically expanded to include bleed and the front cover now displays the book title.
+- Cover images are automatically expanded to include bleed. You can add the book title directly in your artwork, as no text overlay is added.
 - Font sizes are scaled for 300 dpi pages so text remains clear when printed.
 - Please review KDP's latest guidelines for any additional requirements before uploading.
 
