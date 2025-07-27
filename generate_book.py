@@ -4,7 +4,9 @@ generate_book.py
 
 This script generates a simple children's picture book as a PDF.  It takes
 paragraphs of text from a text file and a corresponding set of images and
-produces a PDF sized for an 8.5×8.5‑inch book at 300 dpi (2550 px square).
+produces a PDF sized for an 8.5 inch square book. Pages are rendered at
+300 dpi and can optionally include bleed using KDP's recommended extra
+0.125″ on the outside and 0.25″ on the top and bottom.
 
 The layout comprises a cover page, followed by a pair of pages for each
 paragraph: the first page presents the illustration and the second page
@@ -25,13 +27,24 @@ import math
 # Use 300 pixels per inch so that the output PDF meets KDP’s resolution
 # requirements.
 INCH = 300
-# Define the finished page dimensions in pixels (2550 × 2550 pixels).
-PAGE_SIZE = (8.5 * INCH, 8.5 * INCH)
 
-# Margin around text content (in pixels). KDP requires at least 0.25″
-# (6.35 mm) on the outside, or 0.375″ when using bleed.  We opt for the
-# larger value to ensure nothing is trimmed.
-MARGIN = int(0.375 * INCH)
+# ``USE_BLEED`` controls whether the interior pages include bleed. When set to
+# ``True`` the page dimensions follow KDP's formula of trim width + 0.125″ and
+# trim height + 0.25″. Keep this ``False`` if you disable bleed during upload.
+USE_BLEED = False
+
+TRIM_WIDTH_IN = 8.5
+TRIM_HEIGHT_IN = 8.5
+PAGE_WIDTH_IN = TRIM_WIDTH_IN + (0.125 if USE_BLEED else 0)
+PAGE_HEIGHT_IN = TRIM_HEIGHT_IN + (0.25 if USE_BLEED else 0)
+
+# Define the finished page dimensions in pixels.
+PAGE_SIZE = (PAGE_WIDTH_IN * INCH, PAGE_HEIGHT_IN * INCH)
+
+# Margin around text content (in pixels). KDP requires at least 0.25″ without
+# bleed or 0.375″ with bleed. Match the appropriate value so nothing is
+# trimmed during printing.
+MARGIN = int((0.375 if USE_BLEED else 0.25) * INCH)
 
 # Base font size for body text.  This value will be scaled down if the
 # paragraph is too long to comfortably fit within the available area.  A

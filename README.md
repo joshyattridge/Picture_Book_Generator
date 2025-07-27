@@ -57,6 +57,9 @@ generate_book(texts, images, output_pdf="childrens_book.pdf")
 ## KDP Compatibility
 
 - The generated PDFs use 300 dpi pages measuring 8.5×8.5 inches.
+- Interior pages can include bleed when the ``USE_BLEED`` constant in
+  ``generate_book.py`` is set to ``True``. This expands the page size to
+  8.625×8.75 inches as recommended by KDP.
 - Cover images are automatically expanded to include bleed. The back panel is on the left and the front panel on the right of the PDF spread.
 - Spine text is added when the book has 100 pages or more, but the script does **not** overlay the title on the front cover image.
 - Font sizes are scaled for 300 dpi pages so text remains clear when printed.
