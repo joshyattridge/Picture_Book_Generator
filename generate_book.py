@@ -37,7 +37,14 @@ MARGIN = int(0.375 * INCH)
 # paragraph is too long to comfortably fit within the available area.  A
 # slightly smaller default makes it easier to accommodate longer sentences
 # while still maintaining a child‑friendly appearance.
-FONT_SIZE = 10
+# Scale font sizes relative to the DPI so text remains legible when
+# increasing resolution. The original script used a 75 dpi canvas with
+# a minimum font size of 20 px. At 300 dpi that equates to roughly
+# 80 px. ``FONT_SIZE`` starts slightly smaller so long passages can be
+# scaled down if needed, while ``MIN_FONT_SIZE`` represents the target
+# size for normal pages.
+FONT_SIZE = int(INCH * 0.1333)  # ~40px at 300 dpi
+MIN_FONT_SIZE = int(INCH * 0.2667)  # ~80px at 300 dpi
 
 # Colours used throughout the book.  Pastel shades are deliberately chosen
 # because they are soft and appealing to children.  New pages cycle through
@@ -103,7 +110,7 @@ def add_page_number(img: Image.Image, page_index: int) -> Image.Image:
     number = str(page_index)
     draw = ImageDraw.Draw(result)
     # Use a minimum font size for page numbers instead of percentage of FONT_SIZE
-    page_num_size = max(20, int(FONT_SIZE * 0.4))
+    page_num_size = max(MIN_FONT_SIZE, int(FONT_SIZE * 0.4))
     font = get_font(page_num_size)
     bbox = draw.textbbox((0, 0), number, font=font)
     num_w = bbox[2] - bbox[0]
@@ -289,8 +296,10 @@ def create_text_page(paragraph: str, page_index: int) -> Image.Image:
 
     # Determine the maximum width for text inside the panel
     max_width = panel_rect[2] - panel_rect[0] - 2 * 40  # internal padding
-    # Start with the base font size and reduce as necessary
-    min_font_size = 20
+    # Start with the preferred font size and reduce as necessary. ``MIN_FONT_SIZE``
+    # represents the smallest acceptable text size on the high‑resolution
+    # pages.
+    min_font_size = MIN_FONT_SIZE
     font_size = FONT_SIZE
     # Temporary drawing context used for measuring text.  We'll reuse 'draw'.
     # Use a playful heading font throughout the text to make it feel more
@@ -339,7 +348,7 @@ def create_text_page(paragraph: str, page_index: int) -> Image.Image:
     page_number = page_index
     num_text = str(page_number)
     # Use a minimum font size for page numbers instead of percentage of FONT_SIZE
-    page_num_size = max(20, int(FONT_SIZE * 0.4))
+    page_num_size = max(MIN_FONT_SIZE, int(FONT_SIZE * 0.4))
     pn_font = get_font(page_num_size)
     num_bbox = draw.textbbox((0, 0), num_text, font=pn_font)
     num_w = num_bbox[2] - num_bbox[0]
