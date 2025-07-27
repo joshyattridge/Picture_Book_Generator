@@ -4,7 +4,9 @@ generate_book.py
 
 This script generates a simple children's picture book as a PDF.  It takes
 paragraphs of text from a text file and a corresponding set of images and
-produces a PDF sized for an 8.5×8.5‑inch book at 300 dpi (2550 px square).
+produces a PDF sized for an 8.5 inch square book. Pages are rendered at
+300 dpi and can optionally include bleed using KDP's recommended extra
+0.125″ on the outside and 0.25″ on the top and bottom.
 
 The layout comprises a cover page, followed by a pair of pages for each
 paragraph: the first page presents the illustration and the second page
@@ -18,24 +20,44 @@ stored in ``books/MyBook/images``.  The output PDF will be written to
 """
 
 import os
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 import math
 
-# Constants for an 8.5×8.5‑inch square book at 300 dpi
-INCH = 75
-# Define the finished page dimensions in pixels for an 8.5×8.5 inch book
-PAGE_SIZE = (8.5 * INCH, 8.5 * INCH)
+# Constants for an 8.5×8.5 inch square book at 300 dpi
+# Use 300 pixels per inch so that the output PDF meets KDP’s resolution
+# requirements.
+INCH = 300
 
-# Margin around text content (in pixels).  This is used to inset the text
-# panel from the edge of the page to avoid cramped layouts.  It will also
-# control space for decorative borders and page numbers.
-MARGIN = 35
+# ``USE_BLEED`` controls whether the interior pages include bleed. When set to
+# ``True`` the page dimensions follow KDP's formula of trim width + 0.125″ and
+# trim height + 0.25″. Keep this ``False`` if you disable bleed during upload.
+USE_BLEED = True
+
+TRIM_WIDTH_IN = 8.5
+TRIM_HEIGHT_IN = 8.5
+PAGE_WIDTH_IN = TRIM_WIDTH_IN + (0.125 if USE_BLEED else 0)
+PAGE_HEIGHT_IN = TRIM_HEIGHT_IN + (0.25 if USE_BLEED else 0)
+
+# Define the finished page dimensions in pixels.
+PAGE_SIZE = (PAGE_WIDTH_IN * INCH, PAGE_HEIGHT_IN * INCH)
+
+# Margin around text content (in pixels). KDP requires at least 0.25″ without
+# bleed or 0.375″ with bleed. Match the appropriate value so nothing is
+# trimmed during printing.
+MARGIN = int((0.375 if USE_BLEED else 0.25) * INCH)
 
 # Base font size for body text.  This value will be scaled down if the
 # paragraph is too long to comfortably fit within the available area.  A
 # slightly smaller default makes it easier to accommodate longer sentences
 # while still maintaining a child‑friendly appearance.
-FONT_SIZE = 10
+# Scale font sizes relative to the DPI so text remains legible when
+# increasing resolution. The original script used a 75 dpi canvas with
+# a minimum font size of 20 px. At 300 dpi that equates to roughly
+# 80 px. ``FONT_SIZE`` starts slightly smaller so long passages can be
+# scaled down if needed, while ``MIN_FONT_SIZE`` represents the target
+# size for normal pages.
+FONT_SIZE = int(INCH * 0.1333)  # ~40px at 300 dpi
+MIN_FONT_SIZE = int(INCH * 0.2667)  # ~80px at 300 dpi
 
 # Colours used throughout the book.  Pastel shades are deliberately chosen
 # because they are soft and appealing to children.  New pages cycle through
@@ -101,7 +123,7 @@ def add_page_number(img: Image.Image, page_index: int) -> Image.Image:
     number = str(page_index)
     draw = ImageDraw.Draw(result)
     # Use a minimum font size for page numbers instead of percentage of FONT_SIZE
-    page_num_size = max(20, int(FONT_SIZE * 0.4))
+    page_num_size = max(MIN_FONT_SIZE, int(FONT_SIZE * 0.4))
     font = get_font(page_num_size)
     bbox = draw.textbbox((0, 0), number, font=font)
     num_w = bbox[2] - bbox[0]
@@ -287,8 +309,10 @@ def create_text_page(paragraph: str, page_index: int) -> Image.Image:
 
     # Determine the maximum width for text inside the panel
     max_width = panel_rect[2] - panel_rect[0] - 2 * 40  # internal padding
-    # Start with the base font size and reduce as necessary
-    min_font_size = 20
+    # Start with the preferred font size and reduce as necessary. ``MIN_FONT_SIZE``
+    # represents the smallest acceptable text size on the high‑resolution
+    # pages.
+    min_font_size = MIN_FONT_SIZE
     font_size = FONT_SIZE
     # Temporary drawing context used for measuring text.  We'll reuse 'draw'.
     # Use a playful heading font throughout the text to make it feel more
@@ -337,7 +361,7 @@ def create_text_page(paragraph: str, page_index: int) -> Image.Image:
     page_number = page_index
     num_text = str(page_number)
     # Use a minimum font size for page numbers instead of percentage of FONT_SIZE
-    page_num_size = max(20, int(FONT_SIZE * 0.4))
+    page_num_size = max(MIN_FONT_SIZE, int(FONT_SIZE * 0.4))
     pn_font = get_font(page_num_size)
     num_bbox = draw.textbbox((0, 0), num_text, font=pn_font)
     num_w = num_bbox[2] - num_bbox[0]
@@ -360,23 +384,12 @@ def centre_crop_image(img: Image.Image) -> Image.Image:
     Returns:
         A new ``Image`` object of size ``PAGE_SIZE``.
     """
-    img_ratio = img.width / img.height
-    page_ratio = PAGE_SIZE[0] / PAGE_SIZE[1]
-    if img_ratio > page_ratio:
-        # Image is wider than page: scale height to match, crop width
-        new_height = int(PAGE_SIZE[1])
-        new_width = int(new_height * img_ratio)
-        resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        left = (new_width - PAGE_SIZE[0]) // 2
-        crop = resized.crop((left, 0, left + int(PAGE_SIZE[0]), int(PAGE_SIZE[1])))
-    else:
-        # Image is taller than page: scale width to match, crop height
-        new_width = int(PAGE_SIZE[0])
-        new_height = int(new_width / img_ratio)
-        resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-        top = (new_height - PAGE_SIZE[1]) // 2
-        crop = resized.crop((0, top, int(PAGE_SIZE[0]), top + int(PAGE_SIZE[1])))
-    return crop
+    # ``ImageOps.fit`` handles the scaling and cropping in one step using
+    # floating‑point math internally, which avoids tiny rounding errors that can
+    # leave stray borders.  The resulting image is guaranteed to match
+    # ``PAGE_SIZE`` exactly.
+    size = (int(round(PAGE_SIZE[0])), int(round(PAGE_SIZE[1])))
+    return ImageOps.fit(img, size, Image.Resampling.LANCZOS, centering=(0.5, 0.5))
 
 
 def get_title_from_name(book_name: str) -> str:
@@ -403,27 +416,23 @@ def get_title_from_name(book_name: str) -> str:
     return ''.join(spaced)
 
 
-def create_cover_page(cover_img: Image.Image, book_name: str) -> Image.Image:
-    """Create an enhanced cover page.
+def create_cover_page(cover_img: Image.Image, title: str) -> Image.Image:
+    """Prepare the front cover image without adding any text.
 
-    This function centre‑crops the provided image to square dimensions and
-    overlays a semi‑transparent panel near the bottom containing the book
-    title.  The title is derived from the directory name and uses a larger
-    heading font.  If the underlying image is dark, the light panel ensures
-    the text remains legible.
+    The image is centre‑cropped to the page size so that it fills the
+    bleed area on all sides.  No additional title overlay is applied
+    because many cover designs already include the book title within
+    the artwork.
 
     Args:
         cover_img: Source PIL image for the cover.
-        book_name: Name of the book directory.
+        title: Full book title to render on the front cover.
 
     Returns:
         A PIL ``Image`` representing the decorated cover page.
     """
-    # Simply centre‑crop the cover image.  We intentionally avoid overlaying
-    # text here because many cover images will contain their own titles or
-    # artwork.  By refraining from adding additional elements we maintain
-    # flexibility across a variety of books.  Page numbers are handled
-    # separately by the calling code and are not drawn on the cover.
+    # Simply centre‑crop the provided image and return it. The caller is
+    # responsible for adding any spine text when needed.
     return centre_crop_image(cover_img)
 
 
@@ -431,7 +440,10 @@ def create_cover_page(cover_img: Image.Image, book_name: str) -> Image.Image:
 COVER_WIDTH_INCHES = 17.306
 COVER_HEIGHT_INCHES = 8.750
 DPI = 300
-COVER_SIZE = (int(COVER_WIDTH_INCHES * DPI), int(COVER_HEIGHT_INCHES * DPI))  # (5192, 2625)
+COVER_SIZE = (
+    int(round(COVER_WIDTH_INCHES * DPI)),
+    int(round(COVER_HEIGHT_INCHES * DPI)),
+)
 
 
 def generate_book(book_name: str) -> None:
@@ -456,9 +468,10 @@ def generate_book(book_name: str) -> None:
     # Load cover and back cover images if they exist
     cover_img = None
     back_img = None
+    title = get_title_from_name(book_name)
     if os.path.exists(image_files[0]):
-        cover_img = Image.open(image_files[0]).convert('RGB')
-        cover_page = create_cover_page(cover_img, book_name)
+        cover_img = Image.open(image_files[0]).convert("RGB")
+        cover_page = create_cover_page(cover_img, title)
     else:
         print(f"[SKIP] No cover.jpg found for {book_name}")
         return
@@ -474,28 +487,39 @@ def generate_book(book_name: str) -> None:
     cover_spread = Image.new('RGB', COVER_SIZE, (255, 255, 255))
     half_width = COVER_SIZE[0] // 2
     height = COVER_SIZE[1]
-    # Resize cover and back to fit half the width and full height, maintaining aspect ratio
-    def resize_to_fit(img, target_w, target_h):
-        img_ratio = img.width / img.height
-        target_ratio = target_w / target_h
-        if img_ratio > target_ratio:
-            # Image is wider than target: fit width
-            new_w = target_w
-            new_h = int(target_w / img_ratio)
-        else:
-            # Image is taller than target: fit height
-            new_h = target_h
-            new_w = int(target_h * img_ratio)
-        return img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-    back_resized = resize_to_fit(back_page, half_width, height)
-    cover_resized = resize_to_fit(cover_page, half_width, height)
-    # Center images if not exact fit
-    cover_x = (half_width - cover_resized.width) // 2
-    cover_y = (height - cover_resized.height) // 2
-    back_x = half_width + (half_width - back_resized.width) // 2
-    back_y = (height - back_resized.height) // 2
-    cover_spread.paste(cover_resized, (cover_x, cover_y))
-    cover_spread.paste(back_resized, (back_x, back_y))
+    # Resize and centre crop images so they completely fill each half of the
+    # spread.  This ensures the artwork extends into the bleed area.
+    def fill_crop(img, target_w, target_h):
+        """Resize and crop an image so it completely fills ``target_w``×``target_h``."""
+        size = (int(target_w), int(target_h))
+        return ImageOps.fit(img, size, Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+
+    back_resized = fill_crop(back_page, half_width, height)
+    cover_resized = fill_crop(cover_page, half_width, height)
+    # Place the back cover on the left and the front cover on the right
+    cover_spread.paste(back_resized, (0, 0))
+    cover_spread.paste(cover_resized, (half_width, 0))
+
+    # Add spine text if the book is thick enough
+    page_count = len(paragraphs) * 2
+    if page_count >= 100:
+        spine_width_in = 0.002252 * page_count
+        spine_w = int(spine_width_in * DPI)
+        spine_x = half_width - spine_w // 2
+        spine = Image.new("RGBA", cover_spread.size, (0, 0, 0, 0))
+        font = get_heading_font(int(INCH * 0.2))
+        text = title
+        text_img = Image.new("RGBA", (spine_w, height), (0, 0, 0, 0))
+        tdraw = ImageDraw.Draw(text_img)
+        text_bbox = tdraw.textbbox((0, 0), text, font=font)
+        tw = text_bbox[2] - text_bbox[0]
+        th = text_bbox[3] - text_bbox[1]
+        tx = (spine_w - tw) // 2
+        ty = (height - th) // 2
+        tdraw.text((tx, ty), text, font=font, fill=(0, 0, 0, 255))
+        rotated = text_img.rotate(90, expand=True)
+        spine.paste(rotated, (spine_x, 0), rotated)
+        cover_spread = Image.alpha_composite(cover_spread.convert("RGBA"), spine).convert("RGB")
     # Save the cover spread as a PDF
     cover_spread.save(cover_pdf, "PDF", resolution=300.0)
     print(f'Cover PDF generated at {cover_pdf}')
@@ -519,7 +543,12 @@ def generate_book(book_name: str) -> None:
         pages.append(create_text_page(paragraph, page_idx))
     # Save the manuscript PDF (interior pages only)
     if pages:
-        pages[0].save(output_pdf, save_all=True, append_images=pages[1:])
+        pages[0].save(
+            output_pdf,
+            save_all=True,
+            append_images=pages[1:],
+            resolution=300.0,
+        )
         print(f'Manuscript PDF generated at {output_pdf}')
     else:
         print(f"[SKIP] No interior pages generated for {book_name}")
@@ -534,5 +563,5 @@ def main():
             generate_book(book_name)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
