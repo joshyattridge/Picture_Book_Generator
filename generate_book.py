@@ -31,7 +31,7 @@ INCH = 300
 # ``USE_BLEED`` controls whether the interior pages include bleed. When set to
 # ``True`` the page dimensions follow KDP's formula of trim width + 0.125″ and
 # trim height + 0.25″. Keep this ``False`` if you disable bleed during upload.
-USE_BLEED = False
+USE_BLEED = True
 
 TRIM_WIDTH_IN = 8.5
 TRIM_HEIGHT_IN = 8.5
