@@ -129,7 +129,11 @@ def add_page_number(img: Image.Image, page_index: int) -> Image.Image:
     num_w = bbox[2] - bbox[0]
     num_h = bbox[3] - bbox[1]
     x = (w - num_w) // 2
-    y = int(h - MARGIN * 0.8 - num_h)
+    # Position the page number using the full margin requirement so it isn't
+    # trimmed during printing. KDP specifies a minimum of 0.375" when bleed is
+    # enabled, which we've precomputed as ``MARGIN``. Using the full margin
+    # keeps the text well clear of the trim line.
+    y = int(h - MARGIN - num_h)
     # Optionally draw a subtle shadow for improved contrast
     shadow_offset = 1
     shadow_colour = (0, 0, 0, 100) if avg_brightness > 180 else (255, 255, 255, 100)
@@ -367,7 +371,10 @@ def create_text_page(paragraph: str, page_index: int) -> Image.Image:
     num_w = num_bbox[2] - num_bbox[0]
     num_h = num_bbox[3] - num_bbox[1]
     num_x = (PAGE_SIZE[0] - num_w) // 2
-    num_y = int(PAGE_SIZE[1] - MARGIN * 0.8 - num_h)
+    # Keep the page number outside the trim area using the full margin value
+    # calculated earlier. This prevents the bottom of the digits from being
+    # truncated when the book is printed.
+    num_y = int(PAGE_SIZE[1] - MARGIN - num_h)
     draw.text((num_x, num_y), num_text, font=pn_font, fill=PAGE_NUMBER_COLOUR)
     return img
 
