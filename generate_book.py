@@ -73,7 +73,6 @@ BACKGROUND_COLOURS = [
 TEXT_COLOUR = (40, 40, 40)  # dark grey for comfortable reading
 PANEL_FILL = (255, 255, 255)  # white panel behind text for contrast
 PANEL_BORDER = (200, 200, 200)  # light grey border around text panel
-PAGE_NUMBER_COLOUR = (120, 120, 120)
 
 
 def _brightness(colour: tuple[int, int, int]) -> float:
@@ -87,59 +86,19 @@ def _brightness(colour: tuple[int, int, int]) -> float:
 
 
 def add_page_number(img: Image.Image, page_index: int) -> Image.Image:
-    """Draw a small page number at the bottom centre of an image.
+    """Return the image unchanged (page numbers removed for children's books).
 
-    This helper is used for image pages and back covers so that the page
-    numbers are consistent throughout the book.  The colour of the page
-    number is chosen dynamically based on the luminance of the bottom strip
-    of the image to ensure adequate contrast.
+    This function now simply returns the image without adding page numbers,
+    as they are not needed for children's picture books on KDP.
 
     Args:
-        img: The image onto which to draw the page number.  The image is
-            copied before modification.
-        page_index: Zero‑based index of the page.
+        img: The image to process.
+        page_index: Zero‑based index of the page (unused).
 
     Returns:
-        A new ``Image`` object with the page number drawn.
+        The original image unchanged.
     """
-    result = img.copy().convert('RGBA')
-    # Determine whether the bottom of the image is light or dark.  Sample a
-    # horizontal strip across the bottom 10% of the page to compute average
-    # brightness.
-    w, h = result.size
-    strip_height = max(1, int(h * 0.1))
-    strip = result.crop((0, h - strip_height, w, h)).convert('RGB')
-    pixels = list(strip.getdata())
-    avg_brightness = sum(_brightness(p) for p in pixels) / len(pixels)
-    # Choose text colour based on luminance: dark text on light backgrounds
-    # and vice versa.
-    if avg_brightness > 180:
-        colour = (60, 60, 60, 255)
-    else:
-        colour = (230, 230, 230, 255)
-    # Use the page index itself as the displayed number so that the first
-    # interior page (index 1) is numbered 1.  The cover page (index 0)
-    # is not passed into this function, so numbering naturally starts from 1.
-    number = str(page_index)
-    draw = ImageDraw.Draw(result)
-    # Use a minimum font size for page numbers instead of percentage of FONT_SIZE
-    page_num_size = max(MIN_FONT_SIZE, int(FONT_SIZE * 0.4))
-    font = get_font(page_num_size)
-    bbox = draw.textbbox((0, 0), number, font=font)
-    num_w = bbox[2] - bbox[0]
-    num_h = bbox[3] - bbox[1]
-    x = (w - num_w) // 2
-    # Position the page number using the full margin requirement so it isn't
-    # trimmed during printing. KDP specifies a minimum of 0.375" when bleed is
-    # enabled, which we've precomputed as ``MARGIN``. Using the full margin
-    # keeps the text well clear of the trim line.
-    y = int(h - MARGIN - num_h)
-    # Optionally draw a subtle shadow for improved contrast
-    shadow_offset = 1
-    shadow_colour = (0, 0, 0, 100) if avg_brightness > 180 else (255, 255, 255, 100)
-    # Remove shadow drawing, only draw the main number
-    draw.text((x, y), number, font=font, fill=colour)
-    return result.convert('RGB')
+    return img
 
 
 def _draw_star(draw: ImageDraw.ImageDraw, centre: tuple[float, float], size: float, fill: tuple[int, int, int]):
@@ -269,18 +228,17 @@ def wrap_text(text: str, draw: ImageDraw.Draw, font: ImageFont.ImageFont, max_wi
 def create_text_page(paragraph: str, page_index: int) -> Image.Image:
     """Create a decorated page for a given paragraph.
 
-    The resulting page has a pastel background, a rounded white panel
-    containing the paragraph, and a page number centred at the bottom.  Text
-    wrapping respects explicit newlines and scales down automatically if the
-    content would otherwise overflow the panel.  Colours are selected from
-    ``BACKGROUND_COLOURS`` based on the page index to provide variety across
-    multiple pages without having to tailor for any specific book.
+    The resulting page has a pastel background and a rounded white panel
+    containing the paragraph. Text wrapping respects explicit newlines and 
+    scales down automatically if the content would otherwise overflow the panel.  
+    Colours are selected from ``BACKGROUND_COLOURS`` based on the page index 
+    to provide variety across multiple pages without having to tailor for any 
+    specific book. Page numbers are not included for a cleaner children's book design.
 
     Args:
         paragraph: The paragraph of text to render.
         page_index: Zero‑based index of the page within the book (cover page
-            included).  This is used to select background colours and to
-            determine the page number printed at the bottom.
+            included).  This is used to select background colours.
 
     Returns:
         An ``Image`` object representing the fully laid out page.
@@ -295,7 +253,7 @@ def create_text_page(paragraph: str, page_index: int) -> Image.Image:
         MARGIN,
         MARGIN,
         PAGE_SIZE[0] - MARGIN,
-        PAGE_SIZE[1] - MARGIN * 1.5,  # leave extra space at bottom for page numbers
+        PAGE_SIZE[1] - MARGIN,  # no extra space needed since page numbers are removed
     )
     # Draw the panel.  We intentionally omit the border so the panel blends
     # softly with the pastel background.  Use rounded_rectangle if
@@ -359,23 +317,7 @@ def create_text_page(paragraph: str, page_index: int) -> Image.Image:
         # Only draw the primary text (no shadow)
         draw.text((x, y), line, font=font, fill=TEXT_COLOUR)
         y += line_height + spacing
-    # Add page number at the bottom centre.  Page numbers start at 1 for
-    # the first interior page (page_index 1), so we simply use page_index
-    # itself here.  The cover page is not processed by this function.
-    page_number = page_index
-    num_text = str(page_number)
-    # Use a minimum font size for page numbers instead of percentage of FONT_SIZE
-    page_num_size = max(MIN_FONT_SIZE, int(FONT_SIZE * 0.4))
-    pn_font = get_font(page_num_size)
-    num_bbox = draw.textbbox((0, 0), num_text, font=pn_font)
-    num_w = num_bbox[2] - num_bbox[0]
-    num_h = num_bbox[3] - num_bbox[1]
-    num_x = (PAGE_SIZE[0] - num_w) // 2
-    # Keep the page number outside the trim area using the full margin value
-    # calculated earlier. This prevents the bottom of the digits from being
-    # truncated when the book is printed.
-    num_y = int(PAGE_SIZE[1] - MARGIN - num_h)
-    draw.text((num_x, num_y), num_text, font=pn_font, fill=PAGE_NUMBER_COLOUR)
+    # Page numbers removed for children's books - cleaner design for KDP
     return img
 
 
@@ -541,7 +483,7 @@ def generate_book(book_name: str) -> None:
         img = Image.open(img_path).convert('RGB')
         # Determine the page index for the illustration page
         page_idx = len(pages) + 1  # +1 because cover is not included
-        # Centre crop the illustration and add a page number
+        # Centre crop the illustration (page numbers removed for children's books)
         illustration = add_page_number(centre_crop_image(img), page_idx)
         pages.append(illustration)
         # Now create the corresponding text page.  Its index will be the
