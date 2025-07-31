@@ -170,7 +170,16 @@ def main() -> None:
         f"Do not include any page numbers, headers, or extra text. "
         f"Separate each paragraph with a single blank line. "
         f"The output should be ready to save to a text file, with each page's text as a paragraph separated by a blank line."
+        f"Please spend your time on generating the story and confirm you are meeting the requirements. "
     )
+
+    print("="*50)
+    print("GENERATED STORY PROMPT:")
+    print("="*50)
+    print(story_prompt)
+    print("="*50)
+
+    exit()
     
     story_satisfied = False
     while not story_satisfied:
