@@ -171,7 +171,7 @@ def main() -> None:
         f"Separate each paragraph with a single blank line. "
         f"The output should be ready to save to a text file, with each page's text as a paragraph separated by a blank line."
         f"Please spend your time on generating the story and confirm you are meeting the requirements. "
-        f"please use simple words and sentences appropriate for a 3 year old and keep puncuation to a minimum nothing too complex."
+        f"please use simple words and sentences appropriate for a 3 year old and use simple punctuation."
     )
 
     print("="*50)
