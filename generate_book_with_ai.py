@@ -133,7 +133,7 @@ def save_placeholder_image(prompt: str, out_path: Path):
     img.save(out_path)
 
 
-def chat_completion(messages, client, model="gpt-4o"):
+def chat_completion(messages, client, model="o3"):
     response = client.chat.completions.create(
         model=model,
         messages=messages
