@@ -133,7 +133,7 @@ def save_placeholder_image(prompt: str, out_path: Path):
     img.save(out_path)
 
 
-def chat_completion(messages, client, model="o3"):
+def chat_completion(messages, client, model="gpt-4.1"):
     response = client.chat.completions.create(
         model=model,
         messages=messages
@@ -171,6 +171,7 @@ def main() -> None:
         f"Separate each paragraph with a single blank line. "
         f"The output should be ready to save to a text file, with each page's text as a paragraph separated by a blank line."
         f"Please spend your time on generating the story and confirm you are meeting the requirements. "
+        f"please use simple words and sentences appropriate for a 3 year old and keep puncuation to a minimum nothing too complex."
     )
 
     print("="*50)
@@ -178,8 +179,6 @@ def main() -> None:
     print("="*50)
     print(story_prompt)
     print("="*50)
-
-    exit()
     
     story_satisfied = False
     while not story_satisfied:
