@@ -2,6 +2,7 @@
 
 import os
 import argparse
+from typing import Union
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 # Constants for an 8.5×8.5 inch square book at 300 dpi
@@ -318,7 +319,7 @@ COVER_SIZE = (
 )
 
 
-def generate_book(book_name: str, *, output_dir: str | None = None, skip_cover: bool = False) -> None:
+def generate_book(book_name: str, *, output_dir: Union[str, None] = None, skip_cover: bool = False) -> None:
     """Generate the picture book PDF for a given book folder."""
     book_path = os.path.join(BOOKS_DIR, book_name)
     images_path = os.path.join(book_path, 'images')
