@@ -51,6 +51,19 @@ images = [
 generate_book(texts, images, output_pdf="childrens_book.pdf")
 ```
 
+### Command line usage
+
+The repository also includes a command line script that can process one or more
+book folders contained in the `books/` directory:
+
+```bash
+python generate_book.py                  # generate PDFs for all books
+python generate_book.py --book Peters_Pickle        # only process one book
+python generate_book.py --book BookA --book BookB   # multiple books
+python generate_book.py --book Peters_Pickle --skip-cover    # no cover PDF
+python generate_book.py --book Peters_Pickle -o build        # custom output dir
+```
+
 ## Example Content
 
 - Example text and images are included in the repository for testing.

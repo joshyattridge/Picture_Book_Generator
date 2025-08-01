@@ -1,6 +1,7 @@
 """Generate a simple 8.5×8.5 inch picture book PDF."""
 
 import os
+import argparse
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 # Constants for an 8.5×8.5 inch square book at 300 dpi
@@ -317,13 +318,18 @@ COVER_SIZE = (
 )
 
 
-def generate_book(book_name: str) -> None:
+def generate_book(book_name: str, *, output_dir: str | None = None, skip_cover: bool = False) -> None:
     """Generate the picture book PDF for a given book folder."""
     book_path = os.path.join(BOOKS_DIR, book_name)
     images_path = os.path.join(book_path, 'images')
     text_path = os.path.join(book_path, 'book_text.txt')
-    output_pdf = os.path.join(book_path, f'{book_name}_output.pdf')
-    cover_pdf = os.path.join(book_path, f'{book_name}_cover.pdf')
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+        output_pdf = os.path.join(output_dir, f'{book_name}_output.pdf')
+        cover_pdf = os.path.join(output_dir, f'{book_name}_cover.pdf')
+    else:
+        output_pdf = os.path.join(book_path, f'{book_name}_output.pdf')
+        cover_pdf = os.path.join(book_path, f'{book_name}_cover.pdf')
     # Read paragraphs from the text file
     if not os.path.exists(text_path):
         print(f"[SKIP] No book_text.txt found for {book_name}")
@@ -338,58 +344,59 @@ def generate_book(book_name: str) -> None:
     # --- COVER & BACK COVER HANDLING ---
     # Load cover and back cover images if they exist
     title = get_title_from_name(book_name)
-    if os.path.exists(image_files[0]):
-        cover_page = create_cover_page(Image.open(image_files[0]).convert("RGB"), title)
-    else:
-        print(f"[SKIP] No cover.jpg found for {book_name}")
-        return
-    back_cover_path = os.path.join(images_path, 'back.jpg')
-    if os.path.exists(back_cover_path):
-        back_page = centre_crop_image(Image.open(back_cover_path).convert('RGB'))
-    else:
-        # If no back cover, use a blank page
-        back_page = Image.new('RGB', (int(PAGE_SIZE[0]), int(PAGE_SIZE[1])), (255, 255, 255))
-    # --- KDP COVER SPREAD ---
-    # Create a blank cover spread at KDP-required size
-    cover_spread = Image.new('RGB', COVER_SIZE, (255, 255, 255))
-    half_width = COVER_SIZE[0] // 2
-    height = COVER_SIZE[1]
-    # Resize and centre crop images so they completely fill each half of the
-    # spread.  This ensures the artwork extends into the bleed area.
-    def fill_crop(img, target_w, target_h):
-        """Resize and crop an image so it completely fills ``target_w``×``target_h``."""
-        size = (int(target_w), int(target_h))
-        return ImageOps.fit(img, size, Image.Resampling.LANCZOS, centering=(0.5, 0.5))
+    if not skip_cover:
+        if os.path.exists(image_files[0]):
+            cover_page = create_cover_page(Image.open(image_files[0]).convert("RGB"), title)
+        else:
+            print(f"[SKIP] No cover.jpg found for {book_name}")
+            return
+        back_cover_path = os.path.join(images_path, 'back.jpg')
+        if os.path.exists(back_cover_path):
+            back_page = centre_crop_image(Image.open(back_cover_path).convert('RGB'))
+        else:
+            # If no back cover, use a blank page
+            back_page = Image.new('RGB', (int(PAGE_SIZE[0]), int(PAGE_SIZE[1])), (255, 255, 255))
+        # --- KDP COVER SPREAD ---
+        # Create a blank cover spread at KDP-required size
+        cover_spread = Image.new('RGB', COVER_SIZE, (255, 255, 255))
+        half_width = COVER_SIZE[0] // 2
+        height = COVER_SIZE[1]
+        # Resize and centre crop images so they completely fill each half of the
+        # spread.  This ensures the artwork extends into the bleed area.
+        def fill_crop(img, target_w, target_h):
+            """Resize and crop an image so it completely fills ``target_w``×``target_h``."""
+            size = (int(target_w), int(target_h))
+            return ImageOps.fit(img, size, Image.Resampling.LANCZOS, centering=(0.5, 0.5))
 
-    back_resized = fill_crop(back_page, half_width, height)
-    cover_resized = fill_crop(cover_page, half_width, height)
-    # Place the back cover on the left and the front cover on the right
-    cover_spread.paste(back_resized, (0, 0))
-    cover_spread.paste(cover_resized, (half_width, 0))
+        back_resized = fill_crop(back_page, half_width, height)
+        cover_resized = fill_crop(cover_page, half_width, height)
+        # Place the back cover on the left and the front cover on the right
+        cover_spread.paste(back_resized, (0, 0))
+        cover_spread.paste(cover_resized, (half_width, 0))
 
-    # Add spine text if the book is thick enough
-    page_count = len(paragraphs) * 2
-    if page_count >= 100:
-        spine_width_in = 0.002252 * page_count
-        spine_w = int(spine_width_in * DPI)
-        spine_x = half_width - spine_w // 2
-        spine = Image.new("RGBA", cover_spread.size, (0, 0, 0, 0))
-        font = get_heading_font(int(INCH * 0.2))
-        text = title
-        text_img = Image.new("RGBA", (spine_w, height), (0, 0, 0, 0))
-        tdraw = ImageDraw.Draw(text_img)
-        text_bbox = tdraw.textbbox((0, 0), text, font=font)
-        tw = text_bbox[2] - text_bbox[0]
-        th = text_bbox[3] - text_bbox[1]
-        tx = (spine_w - tw) // 2
-        ty = (height - th) // 2
-        tdraw.text((tx, ty), text, font=font, fill=(0, 0, 0, 255))
-        rotated = text_img.rotate(90, expand=True)
-        spine.paste(rotated, (spine_x, 0), rotated)
-        cover_spread = Image.alpha_composite(cover_spread.convert("RGBA"), spine).convert("RGB")
-    # Save the cover spread as a PDF
-    cover_spread.save(cover_pdf, "PDF", resolution=300.0)
-    print(f'Cover PDF generated at {cover_pdf}')
+        # Add spine text if the book is thick enough
+        page_count = len(paragraphs) * 2
+        if page_count >= 100:
+            spine_width_in = 0.002252 * page_count
+            spine_w = int(spine_width_in * DPI)
+            spine_x = half_width - spine_w // 2
+            spine = Image.new("RGBA", cover_spread.size, (0, 0, 0, 0))
+            font = get_heading_font(int(INCH * 0.2))
+            text = title
+            text_img = Image.new("RGBA", (spine_w, height), (0, 0, 0, 0))
+            tdraw = ImageDraw.Draw(text_img)
+            text_bbox = tdraw.textbbox((0, 0), text, font=font)
+            tw = text_bbox[2] - text_bbox[0]
+            th = text_bbox[3] - text_bbox[1]
+            tx = (spine_w - tw) // 2
+            ty = (height - th) // 2
+            tdraw.text((tx, ty), text, font=font, fill=(0, 0, 0, 255))
+            rotated = text_img.rotate(90, expand=True)
+            spine.paste(rotated, (spine_x, 0), rotated)
+            cover_spread = Image.alpha_composite(cover_spread.convert("RGBA"), spine).convert("RGB")
+        # Save the cover spread as a PDF
+        cover_spread.save(cover_pdf, "PDF", resolution=300.0)
+        print(f'Cover PDF generated at {cover_pdf}')
     # --- INTERIOR PAGES (MANUSCRIPT) ---
     pages: list[Image.Image] = []
     # Create pages for each paragraph (illustration + text)
@@ -420,13 +427,38 @@ def generate_book(book_name: str) -> None:
         print(f"[SKIP] No interior pages generated for {book_name}")
 
 
-def main():
-    # Loop through all subdirectories in books/
-    for book_name in os.listdir(BOOKS_DIR):
-        book_path = os.path.join(BOOKS_DIR, book_name)
-        if os.path.isdir(book_path):
-            print(f'Generating book for: {book_name}')
-            generate_book(book_name)
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Generate picture book PDFs")
+    parser.add_argument(
+        "-b",
+        "--book",
+        action="append",
+        help="Book folder inside 'books/'. Can be supplied multiple times.",
+    )
+    parser.add_argument(
+        "--skip-cover",
+        action="store_true",
+        help="Skip generating the cover PDF",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-dir",
+        help="Directory to place generated PDFs. Defaults to the book folder.",
+    )
+    args = parser.parse_args()
+
+    if args.book:
+        book_names = args.book
+    else:
+        book_names = [
+            d
+            for d in os.listdir(BOOKS_DIR)
+            if os.path.isdir(os.path.join(BOOKS_DIR, d))
+        ]
+
+    for book_name in book_names:
+        print(f"Generating book for: {book_name}")
+        generate_book(book_name, output_dir=args.output_dir, skip_cover=args.skip_cover)
 
 if __name__ == "__main__":
     main()
