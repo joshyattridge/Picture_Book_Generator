@@ -1,27 +1,7 @@
-"""
-generate_book.py
-==================
-
-This script generates a simple children's picture book as a PDF.  It takes
-paragraphs of text from a text file and a corresponding set of images and
-produces a PDF sized for an 8.5 inch square book. Pages are rendered at
-300 dpi and can optionally include bleed using KDP's recommended extra
-0.125″ on the outside and 0.25″ on the top and bottom.
-
-The layout comprises a cover page, followed by a pair of pages for each
-paragraph: the first page presents the illustration and the second page
-presents the text on a white background.  The font size and line wrapping
-have been tuned so that text sits comfortably on the page without
-overflowing.
-
-To change the content, update ``books/MyBook/book_text.txt`` and the images
-stored in ``books/MyBook/images``.  The output PDF will be written to
-``books/MyBook/MyBook_output.pdf``.
-"""
+"""Generate a simple 8.5×8.5 inch picture book PDF."""
 
 import os
 from PIL import Image, ImageDraw, ImageFont, ImageOps
-import math
 
 # Constants for an 8.5×8.5 inch square book at 300 dpi
 # Use 300 pixels per inch so that the output PDF meets KDP’s resolution
@@ -72,62 +52,9 @@ BACKGROUND_COLOURS = [
 
 TEXT_COLOUR = (40, 40, 40)  # dark grey for comfortable reading
 PANEL_FILL = (255, 255, 255)  # white panel behind text for contrast
-PANEL_BORDER = (200, 200, 200)  # light grey border around text panel
-
-
-def _brightness(colour: tuple[int, int, int]) -> float:
-    """Compute a luminance value from an RGB colour.
-
-    The returned value is a weighted sum approximating human perception of
-    brightness.  It falls in the range 0–255.
-    """
-    r, g, b = colour
-    return 0.299 * r + 0.587 * g + 0.114 * b
-
-
-def add_page_number(img: Image.Image, page_index: int) -> Image.Image:
-    """Return the image unchanged (page numbers removed for children's books).
-
-    This function now simply returns the image without adding page numbers,
-    as they are not needed for children's picture books on KDP.
-
-    Args:
-        img: The image to process.
-        page_index: Zero‑based index of the page (unused).
-
-    Returns:
-        The original image unchanged.
-    """
-    return img
-
-
-def _draw_star(draw: ImageDraw.ImageDraw, centre: tuple[float, float], size: float, fill: tuple[int, int, int]):
-    """Draw a five‑pointed star centred at the given coordinates.
-
-    Args:
-        draw: The drawing context.
-        centre: (x, y) coordinates of the star's centre.
-        size: The outer radius of the star.
-        fill: RGB colour tuple for the star.
-    """
-    cx, cy = centre
-    points: list[tuple[float, float]] = []
-    for i in range(5):
-        outer_angle = math.radians(90 + i * 72)
-        inner_angle = math.radians(90 + i * 72 + 36)
-        outer = (cx + size * math.cos(outer_angle), cy - size * math.sin(outer_angle))
-        inner = (cx + size * 0.5 * math.cos(inner_angle), cy - size * 0.5 * math.sin(inner_angle))
-        points.append(outer)
-        points.append(inner)
-    draw.polygon(points, fill=fill)
 
 # Book configuration
 BOOKS_DIR = 'books'
-BOOK_NAME = 'MyBook'
-BOOK_PATH = os.path.join(BOOKS_DIR, BOOK_NAME)
-IMAGES_PATH = os.path.join(BOOK_PATH, 'images')
-TEXT_PATH = os.path.join(BOOK_PATH, 'book_text.txt')
-OUTPUT_PDF = os.path.join(BOOK_PATH, f'{BOOK_NAME}_output.pdf')
 
 
 def get_font(size: int) -> ImageFont.FreeTypeFont:
@@ -263,11 +190,6 @@ def create_text_page(paragraph: str, page_index: int) -> Image.Image:
     except Exception:
         draw.rectangle(panel_rect, fill=PANEL_FILL, outline=None)
 
-    # Remove decorative stars - commented out
-    # star_colour = tuple(max(0, int(c * 0.8)) for c in bg_colour)
-    # star_size = 30
-    # _draw_star(draw, (MARGIN / 2, MARGIN / 2), star_size, star_colour)
-    # _draw_star(draw, (PAGE_SIZE[0] - MARGIN / 2, MARGIN / 2), star_size, star_colour)
 
     # Determine the maximum width for text inside the panel
     max_width = panel_rect[2] - panel_rect[0] - 2 * 40  # internal padding
@@ -415,19 +337,15 @@ def generate_book(book_name: str) -> None:
         image_files.append(os.path.join(images_path, f'page{i}.jpg'))
     # --- COVER & BACK COVER HANDLING ---
     # Load cover and back cover images if they exist
-    cover_img = None
-    back_img = None
     title = get_title_from_name(book_name)
     if os.path.exists(image_files[0]):
-        cover_img = Image.open(image_files[0]).convert("RGB")
-        cover_page = create_cover_page(cover_img, title)
+        cover_page = create_cover_page(Image.open(image_files[0]).convert("RGB"), title)
     else:
         print(f"[SKIP] No cover.jpg found for {book_name}")
         return
     back_cover_path = os.path.join(images_path, 'back.jpg')
     if os.path.exists(back_cover_path):
-        back_img = Image.open(back_cover_path).convert('RGB')
-        back_page = centre_crop_image(back_img)
+        back_page = centre_crop_image(Image.open(back_cover_path).convert('RGB'))
     else:
         # If no back cover, use a blank page
         back_page = Image.new('RGB', (int(PAGE_SIZE[0]), int(PAGE_SIZE[1])), (255, 255, 255))
@@ -483,9 +401,8 @@ def generate_book(book_name: str) -> None:
         img = Image.open(img_path).convert('RGB')
         # Determine the page index for the illustration page
         page_idx = len(pages) + 1  # +1 because cover is not included
-        # Centre crop the illustration (page numbers removed for children's books)
-        illustration = add_page_number(centre_crop_image(img), page_idx)
-        pages.append(illustration)
+        # Centre crop the illustration
+        pages.append(centre_crop_image(img))
         # Now create the corresponding text page.  Its index will be the
         # current length of pages (image was just appended) + 1
         page_idx = len(pages) + 1
@@ -510,7 +427,6 @@ def main():
         if os.path.isdir(book_path):
             print(f'Generating book for: {book_name}')
             generate_book(book_name)
-
 
 if __name__ == "__main__":
     main()
