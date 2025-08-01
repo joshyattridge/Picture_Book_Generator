@@ -16,11 +16,13 @@ This project is a simple PDF children's book generator. It allows you to provide
 - Python 3.7+
 - [Pillow](https://python-pillow.org/)
 - [pdfplumber](https://github.com/jsvine/pdfplumber)
+- [OpenAI](https://github.com/openai/openai-python)
+- [httpx](https://github.com/encode/httpx)
 
 Install dependencies with:
 
 ```bash
-pip install Pillow pdfplumber
+pip install -r requirements.txt
 ```
 
 ## Usage

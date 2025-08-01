@@ -1,0 +1,4 @@
+Pillow
+pdfplumber
+openai
+httpx
