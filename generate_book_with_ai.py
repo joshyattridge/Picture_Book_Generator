@@ -158,7 +158,7 @@ def main() -> None:
         {"role": "system", "content": "You are a helpful assistant for generating children's books. You will be asked to write stories and describe images for illustration. Always keep the story and illustrations consistent."}
     ]
 
-    print("\n[1/4] Generating story text...")
+    print("\n[1/6] Generating story text...")
     
     # Generate story text with feedback loop
     prose_or_rhyme = "in rhyming verse" if info["book_type"].startswith("r") else "in prose"
@@ -227,7 +227,7 @@ def main() -> None:
     # Save the final story
     (book_dir / "book_text.txt").write_text("\n\n".join(pages), encoding="utf-8")
 
-    print("[2/4] Generating cover image description and image...")
+    print("[2/6] Generating cover image...")
     # Generate cover image description
     cover_prompt = (
         f"Create a cover image for a children's book titled '{info['title']}'. "
@@ -244,7 +244,7 @@ def main() -> None:
         cover_b64 = base64.b64encode(cf.read()).decode("utf-8")
 
     # Generate back cover image
-    print("[2.5/4] Generating back cover image...")
+    print("[3/6] Generating back cover image...")
     back_cover_prompt = (
         f"Create a square illustration of the main element from the children's book titled '{info['title']}'. "
         f"The main element may be the main character or a central object, as appropriate for the story. "
@@ -255,10 +255,10 @@ def main() -> None:
     back_cover_path = img_dir / "back.jpg"
     generate_dalle_image(back_cover_prompt, back_cover_path, client, reference_image=cover_path)
 
-    print("[3/4] Generating page images...")
+    print("[4/6] Generating title page...")
     
     # Generate title page (page 1) first
-    print("    [Page 1] Generating title page...")
+    print("    Generating title page image...")
     title_page_prompt = (
         f"Create a title page illustration for the children's book '{info['title']}'. "
         f"This is page 1 - a simple, elegant title page. "
@@ -272,9 +272,10 @@ def main() -> None:
     )
     generate_dalle_image(title_page_prompt, img_dir / "page1.jpg", client, reference_image=cover_path)
     
+    print("[5/6] Generating story page images...")
     # Generate story pages (starting from page 2)
     for i, page_text in enumerate(pages, start=1):
-        print(f"    [Page {i+1}] Generating image description and image...")
+        print(f"    Generating page {i+1} image...")
         page_prompt = (
             f"Create an illustration for page {i+1} of the book '{info['title']}'. "
             f"Use the same style as the cover. {info['style']} "
@@ -287,7 +288,7 @@ def main() -> None:
         )
         generate_dalle_image(page_prompt, img_dir / f"page{i+1}.jpg", client, reference_image=cover_path)
 
-    print(f"[4/4] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
+    print(f"[6/6] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
 
 
 if __name__ == "__main__":
