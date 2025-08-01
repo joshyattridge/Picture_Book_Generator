@@ -1,13 +1,11 @@
 import os
 from pathlib import Path
 from typing import Optional
-import openai
 import httpx
 import base64
 import json
 from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
-
 
 def generate_dalle_image(
     prompt: str,
@@ -240,8 +238,6 @@ def main() -> None:
     )
     cover_path = img_dir / "cover.jpg"
     generate_dalle_image(cover_prompt, cover_path, client)
-    with cover_path.open("rb") as cf:
-        cover_b64 = base64.b64encode(cf.read()).decode("utf-8")
 
     # Generate back cover image
     print("[3/6] Generating back cover image...")
@@ -289,7 +285,6 @@ def main() -> None:
         generate_dalle_image(page_prompt, img_dir / f"page{i+1}.jpg", client, reference_image=cover_path)
 
     print(f"[6/6] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
-
 
 if __name__ == "__main__":
     main()
