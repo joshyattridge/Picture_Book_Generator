@@ -325,11 +325,11 @@ def generate_book(book_name: str, *, output_dir: str | None = None, skip_cover: 
     text_path = os.path.join(book_path, 'book_text.txt')
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
-        output_pdf = os.path.join(output_dir, f'{book_name}_output.pdf')
-        cover_pdf = os.path.join(output_dir, f'{book_name}_cover.pdf')
+        output_pdf = os.path.join(output_dir, 'manuscript.pdf')
+        cover_pdf = os.path.join(output_dir, 'cover.pdf')
     else:
-        output_pdf = os.path.join(book_path, f'{book_name}_output.pdf')
-        cover_pdf = os.path.join(book_path, f'{book_name}_cover.pdf')
+        output_pdf = os.path.join(book_path, 'manuscript.pdf')
+        cover_pdf = os.path.join(book_path, 'cover.pdf')
     # Read paragraphs from the text file
     if not os.path.exists(text_path):
         print(f"[SKIP] No book_text.txt found for {book_name}")
