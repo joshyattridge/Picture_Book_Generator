@@ -53,15 +53,22 @@ generate_book(texts, images, output_pdf="childrens_book.pdf")
 
 ### Command line usage
 
-The repository also includes a command line script that can process one or more
-book folders contained in the `books/` directory:
+Use `generate_book.py` to interactively create a new picture book. You can
+optionally supply an existing image to guide the cover art, and the resulting
+cover will be used as a reference for the rest of the illustrations:
 
 ```bash
-python generate_book.py                  # generate PDFs for all books
-python generate_book.py --book Peters_Pickle        # only process one book
-python generate_book.py --book BookA --book BookB   # multiple books
-python generate_book.py --book Peters_Pickle --skip-cover    # no cover PDF
-python generate_book.py --book Peters_Pickle -o build        # custom output dir
+python generate_book.py --cover-reference my_photo.jpg
+```
+
+To turn prepared book folders in `books/` into PDFs, use `build_book.py`:
+
+```bash
+python build_book.py                  # generate PDFs for all books
+python build_book.py --book Peters_Pickle        # only process one book
+python build_book.py --book BookA --book BookB   # multiple books
+python build_book.py --book Peters_Pickle --skip-cover    # no cover PDF
+python build_book.py --book Peters_Pickle -o build        # custom output dir
 ```
 
 ## Example Content
