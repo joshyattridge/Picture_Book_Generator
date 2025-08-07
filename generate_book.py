@@ -8,7 +8,7 @@ from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
 from build_book import generate_book as build_pdf
 
-def generate_dalle_image(
+def generate_image(
     prompt: str,
     out_path: Path,
     client: OpenAI,
@@ -238,7 +238,7 @@ def main() -> None:
         f"LOCKED: main character appearance."
     )
     cover_path = img_dir / "cover.jpg"
-    generate_dalle_image(cover_prompt, cover_path, client)
+    generate_image(cover_prompt, cover_path, client)
 
     # Generate back cover image
     print("[3/7] Generating back cover image...")
@@ -250,7 +250,7 @@ def main() -> None:
         f"Do not include any letters or text."
     )
     back_cover_path = img_dir / "back.jpg"
-    generate_dalle_image(back_cover_prompt, back_cover_path, client, reference_image=cover_path)
+    generate_image(back_cover_prompt, back_cover_path, client, reference_image=cover_path)
 
     print("[4/7] Generating title page...")
     
@@ -267,7 +267,7 @@ def main() -> None:
         f"Make it clean and simple - just the main subject and title text. "
         f"Using the provided reference image, maintain visual continuity for the main character."
     )
-    generate_dalle_image(title_page_prompt, img_dir / "page1.jpg", client, reference_image=cover_path)
+    generate_image(title_page_prompt, img_dir / "page1.jpg", client, reference_image=cover_path)
     
     print("[5/7] Generating story page images...")
     # Generate story pages (starting from page 2)
@@ -283,7 +283,7 @@ def main() -> None:
             f"The text for this page is: {page_text}"
             f"Please DON'T include any text in the image. as this it printed on a different page."
         )
-        generate_dalle_image(page_prompt, img_dir / f"page{i+1}.jpg", client, reference_image=cover_path)
+        generate_image(page_prompt, img_dir / f"page{i+1}.jpg", client, reference_image=cover_path)
 
     print(f"[6/7] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
 
