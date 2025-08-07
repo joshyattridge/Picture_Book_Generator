@@ -1,4 +1,5 @@
 import os
+import argparse
 from pathlib import Path
 from typing import Optional
 import httpx
@@ -140,7 +141,7 @@ def chat_completion(messages, client, model="gpt-4.1"):
     return response.choices[0].message.content.strip()
 
 
-def main() -> None:
+def main(cover_reference: Optional[Path] = None) -> None:
     print("\n========== Picture Book Generator ==========")
     info = prompt_user()
 
@@ -238,7 +239,7 @@ def main() -> None:
         f"LOCKED: main character appearance."
     )
     cover_path = img_dir / "cover.jpg"
-    generate_image(cover_prompt, cover_path, client)
+    generate_image(cover_prompt, cover_path, client, reference_image=cover_reference)
 
     # Generate back cover image
     print("[3/7] Generating back cover image...")
@@ -295,4 +296,15 @@ def main() -> None:
         print(f"Failed to build PDF: {exc}")
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Generate a children's picture book")
+    parser.add_argument(
+        "--cover-reference",
+        type=Path,
+        help="Path to an image used as a reference for the cover",
+    )
+    args = parser.parse_args()
+    ref_img = args.cover_reference
+    if ref_img and not ref_img.exists():
+        print(f"Reference image {ref_img} not found. Continuing without it.")
+        ref_img = None
+    main(ref_img)
