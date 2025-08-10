@@ -1,0 +1,17 @@
+request_name	input_tokens	output_tokens
+story_attempt_1: input_tokens=195, output_tokens=465
+cover_image: input_tokens=598, output_tokens=4160
+back_cover_image: input_tokens=4474, output_tokens=4160
+title_page_image: input_tokens=4521, output_tokens=4160
+page_2_image: input_tokens=4529, output_tokens=4160
+page_3_image: input_tokens=4531, output_tokens=4160
+page_4_image: input_tokens=4532, output_tokens=4160
+page_5_image: input_tokens=4530, output_tokens=4160
+page_6_image: input_tokens=4532, output_tokens=4160
+page_7_image: input_tokens=4539, output_tokens=4160
+page_8_image: input_tokens=4535, output_tokens=4160
+page_9_image: input_tokens=4530, output_tokens=4160
+page_10_image: input_tokens=4531, output_tokens=4160
+page_11_image: input_tokens=4530, output_tokens=4160
+page_12_image: input_tokens=4530, output_tokens=4160
+page_13_image: input_tokens=4537, output_tokens=4160
