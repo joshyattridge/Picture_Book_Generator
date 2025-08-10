@@ -9,14 +9,43 @@ from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
 from build_book import generate_book as build_pdf
 
+
+def log_token_usage(token_file: Path, request_name: str, input_tokens: int, output_tokens: int) -> None:
+    """Append token usage information to a file and echo to console."""
+    line = f"{request_name}: input_tokens={input_tokens}, output_tokens={output_tokens}\n"
+    with token_file.open("a", encoding="utf-8") as f:
+        f.write(line)
+    print(line.strip())
+
+
+def get_token_counts(resp) -> tuple[int, int]:
+    """Extract input and output token counts from an OpenAI response."""
+    usage = getattr(resp, "usage", None)
+    if usage is None:
+        return 0, 0
+    if isinstance(usage, dict):
+        input_tokens = usage.get("input_tokens") or usage.get("prompt_tokens") or 0
+        output_tokens = usage.get("output_tokens") or usage.get("completion_tokens") or 0
+    else:
+        input_tokens = getattr(usage, "input_tokens", None)
+        if input_tokens is None:
+            input_tokens = getattr(usage, "prompt_tokens", 0)
+        output_tokens = getattr(usage, "output_tokens", None)
+        if output_tokens is None:
+            output_tokens = getattr(usage, "completion_tokens", 0)
+    return input_tokens or 0, output_tokens or 0
+
 def generate_image(
     prompt: str,
     out_path: Path,
     client: OpenAI,
+    token_file: Path,
+    request_name: str,
     reference_image: Optional[Path] = None,
 ) -> None:
     """Generate an image using gpt-image-1, falling back to a placeholder."""
 
+    input_tokens = output_tokens = 0
     try:
         if reference_image and reference_image.exists():
             with reference_image.open("rb") as rf:
@@ -35,12 +64,15 @@ def generate_image(
                 output_format="jpeg",
                 user="picture-book-generator",
             )
+        input_tokens, output_tokens = get_token_counts(resp)
         img_b64 = resp.data[0].b64_json
         with open(out_path, "wb") as f:
             f.write(base64.b64decode(img_b64))
     except Exception as exc:
         print(f"Image generation failed: {exc}. Using placeholder.")
         save_placeholder_image(prompt, out_path)
+    finally:
+        log_token_usage(token_file, request_name, input_tokens, output_tokens)
 
 
 def prompt_user() -> dict:
@@ -133,11 +165,13 @@ def save_placeholder_image(prompt: str, out_path: Path):
     img.save(out_path)
 
 
-def chat_completion(messages, client, model="gpt-4.1"):
+def chat_completion(messages, client, token_file: Path, request_name: str, model="gpt-4.1"):
     response = client.chat.completions.create(
         model=model,
-        messages=messages
+        messages=messages,
     )
+    input_tokens, output_tokens = get_token_counts(response)
+    log_token_usage(token_file, request_name, input_tokens, output_tokens)
     return response.choices[0].message.content.strip()
 
 
@@ -149,6 +183,9 @@ def main(cover_reference: Optional[Path] = None) -> None:
     book_dir = Path("books") / info["title"].replace(" ", "_")
     img_dir = book_dir / "images"
     img_dir.mkdir(parents=True, exist_ok=True)
+
+    token_file = book_dir / "token_record.txt"
+    token_file.write_text("request_name\tinput_tokens\toutput_tokens\n", encoding="utf-8")
 
     api_key = get_api_key()
     client = OpenAI(api_key=api_key, http_client=httpx.Client())
@@ -181,9 +218,11 @@ def main(cover_reference: Optional[Path] = None) -> None:
     print("="*50)
     
     story_satisfied = False
+    attempt = 1
     while not story_satisfied:
         messages.append({"role": "user", "content": story_prompt})
-        story_text = chat_completion(messages, client)
+        story_text = chat_completion(messages, client, token_file, f"story_attempt_{attempt}")
+        attempt += 1
         pages = [p.strip() for p in story_text.split("\n\n") if p.strip()]
         
         # Check if the generated story has the correct number of pages
@@ -239,7 +278,7 @@ def main(cover_reference: Optional[Path] = None) -> None:
         f"LOCKED: main character appearance."
     )
     cover_path = img_dir / "cover.jpg"
-    generate_image(cover_prompt, cover_path, client, reference_image=cover_reference)
+    generate_image(cover_prompt, cover_path, client, token_file, "cover_image", reference_image=cover_reference)
 
     # Generate back cover image
     print("[3/7] Generating back cover image...")
@@ -251,7 +290,7 @@ def main(cover_reference: Optional[Path] = None) -> None:
         f"Do not include any letters or text."
     )
     back_cover_path = img_dir / "back.jpg"
-    generate_image(back_cover_prompt, back_cover_path, client, reference_image=cover_path)
+    generate_image(back_cover_prompt, back_cover_path, client, token_file, "back_cover_image", reference_image=cover_path)
 
     print("[4/7] Generating title page...")
     
@@ -268,7 +307,7 @@ def main(cover_reference: Optional[Path] = None) -> None:
         f"Make it clean and simple - just the main subject and title text. "
         f"Using the provided reference image, maintain visual continuity for the main character."
     )
-    generate_image(title_page_prompt, img_dir / "page1.jpg", client, reference_image=cover_path)
+    generate_image(title_page_prompt, img_dir / "page1.jpg", client, token_file, "title_page_image", reference_image=cover_path)
     
     print("[5/7] Generating story page images...")
     # Generate story pages (starting from page 2)
@@ -284,7 +323,7 @@ def main(cover_reference: Optional[Path] = None) -> None:
             f"The text for this page is: {page_text}"
             f"Please DON'T include any text in the image. as this it printed on a different page."
         )
-        generate_image(page_prompt, img_dir / f"page{i+1}.jpg", client, reference_image=cover_path)
+        generate_image(page_prompt, img_dir / f"page{i+1}.jpg", client, token_file, f"page_{i+1}_image", reference_image=cover_path)
 
     print(f"[6/7] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
 
