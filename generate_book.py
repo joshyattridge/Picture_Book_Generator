@@ -322,6 +322,7 @@ def main(cover_reference: Optional[Path] = None) -> None:
             f"LOCKED: main character appearance. Using the provided reference image, maintain visual continuity. "
             f"The text for this page is: {page_text}"
             f"Please DON'T include any text in the image. as this it printed on a different page."
+            f"Also make the images different from each other so keep the style and characters consistent but use different poses, backgrounds, and objects."
         )
         generate_image(page_prompt, img_dir / f"page{i+1}.jpg", client, token_file, f"page_{i+1}_image", reference_image=cover_path)
 
