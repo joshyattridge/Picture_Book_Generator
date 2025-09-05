@@ -75,8 +75,12 @@ def generate_image(
         log_token_usage(token_file, request_name, input_tokens, output_tokens)
 
 
-def prompt_user() -> dict:
-    """Collect book information from the user, with option to reuse previous prompts."""
+def prompt_user() -> tuple[dict, bool, bool]:
+    """Collect book information from the user, with option to reuse previous prompts.
+
+    Returns a tuple of (info, regenerate_text, regenerate_images). The regeneration
+    choices are not persisted to disk and are asked each run.
+    """
     books_dir = Path("books")
     books_dir.mkdir(exist_ok=True)
     existing_books = [d for d in books_dir.iterdir() if d.is_dir() and (d / "prompt.json").exists()]
@@ -98,6 +102,9 @@ def prompt_user() -> dict:
             selected_book_dir = existing_books[choice-1]
             with open(selected_book_dir / "prompt.json", "r", encoding="utf-8") as f:
                 info = json.load(f)
+                # Ensure transient flags are not carried over from old files
+                info.pop("regenerate_text", None)
+                info.pop("regenerate_images", None)
                 print(f"Loaded prompt for '{info['title']}'")
             
             # Check if existing content is available
@@ -139,16 +146,16 @@ def prompt_user() -> dict:
             "style": style,
         }
     
-    # Add regeneration flags to info
-    info["regenerate_text"] = regenerate_text
-    info["regenerate_images"] = regenerate_images
-    
     # Save prompt to book folder
     book_dir = books_dir / info["title"].replace(" ", "_")
     book_dir.mkdir(parents=True, exist_ok=True)
+    # Ensure only persistent fields are saved
+    info_to_save = dict(info)
+    info_to_save.pop("regenerate_text", None)
+    info_to_save.pop("regenerate_images", None)
     with open(book_dir / "prompt.json", "w", encoding="utf-8") as f:
-        json.dump(info, f, indent=2)
-    return info
+        json.dump(info_to_save, f, indent=2)
+    return info, regenerate_text, regenerate_images
 
 
 def get_api_key() -> str:
@@ -201,7 +208,7 @@ def chat_completion(messages, client, token_file: Path, request_name: str, model
 
 def main(cover_reference: Optional[Path] = None) -> None:
     print("\n========== Picture Book Generator ==========")
-    info = prompt_user()
+    info, regenerate_text, regenerate_images = prompt_user()
 
     # Directory setup
     book_dir = Path("books") / info["title"].replace(" ", "_")
@@ -220,7 +227,7 @@ def main(cover_reference: Optional[Path] = None) -> None:
     ]
 
     # Handle story text generation or reuse
-    if info.get("regenerate_text", True):
+    if regenerate_text:
         print("\n[1/7] Generating story text...")
         
         # Generate story text with feedback loop
@@ -322,7 +329,7 @@ def main(cover_reference: Optional[Path] = None) -> None:
 
     # Handle cover image generation or reuse
     cover_path = img_dir / "cover.jpg"
-    if info.get("regenerate_images", True):
+    if regenerate_images:
         print("[2/7] Generating cover image...")
         # Generate cover image description
         cover_prompt = (
@@ -352,7 +359,7 @@ def main(cover_reference: Optional[Path] = None) -> None:
 
     # Handle back cover image generation or reuse
     back_cover_path = img_dir / "back.jpg"
-    if info.get("regenerate_images", True):
+    if regenerate_images:
         print("[3/7] Generating back cover image...")
         back_cover_prompt = (
             f"Create a square illustration of the main element from the children's book titled '{info['title']}'. "
@@ -377,7 +384,7 @@ def main(cover_reference: Optional[Path] = None) -> None:
 
     # Handle title page generation or reuse
     title_page_path = img_dir / "page1.jpg"
-    if info.get("regenerate_images", True):
+    if regenerate_images:
         print("[4/7] Generating title page...")
         print("    Generating title page image...")
         title_page_prompt = (
@@ -410,7 +417,7 @@ def main(cover_reference: Optional[Path] = None) -> None:
             generate_image(title_page_prompt, title_page_path, client, token_file, "title_page_image", reference_image=cover_path)
     
     # Handle story page images generation or reuse
-    if info.get("regenerate_images", True):
+    if regenerate_images:
         print("[5/7] Generating story page images...")
         # Generate story pages (starting from page 2)
         for i, page_text in enumerate(pages, start=1):
