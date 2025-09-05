@@ -1,3 +1,9 @@
+> ⚠️ IMPORTANT COST WARNING
+>
+> - API requests are expensive. A 12‑page book can cost roughly $3–$4 to generate (story + images), depending on your model/pricing.
+> - If your OpenAI account balance is insufficient, generation may fail part‑way through. Any partial progress will still be billed, and you will need to rerun the entire book generation from the start.
+> - To avoid surprise costs, test with `--demo` first and only switch to real mode when ready.
+
 # Children's Picture Book Generator
 
 Generate a fully illustrated children's book with text and images, then build print‑ready PDFs sized for 8.5×8.5 inches at 300 dpi (KDP‑friendly).
