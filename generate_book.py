@@ -7,6 +7,13 @@ import json
 from openai import OpenAI
 # PIL not required here anymore; demo image gen lives in demo_client.py
 from build_book import generate_book as build_pdf
+from prompts import (
+    make_story_prompt,
+    make_cover_prompt,
+    make_back_cover_prompt,
+    make_title_page_prompt,
+    make_page_prompt,
+)
 
 from demo_client import DemoOpenAI
 
@@ -111,18 +118,7 @@ def main(
     # Generate story text
     print("\n[1/7] Generating story text...")
     # Generate story text and confirm acceptance interactively once
-    story_prompt = (
-        f"Write a {info['pages']}-page children's book. "
-        f"The title is '{info['title']}'. "
-        f"It is about {info['topic']}. "
-        f"The style should be {info['book_type']}. "
-        f"Output exactly {info['pages']} paragraphs, one for each page, in order. "
-        f"Do not include any page numbers, headers, or extra text. "
-        f"Separate each paragraph with a single blank line. "
-        f"The output should be ready to save to a text file, with each page's text as a paragraph separated by a blank line."
-        f"Please spend your time on generating the story and confirm you are meeting the requirements. "
-        f"please use simple words and sentences appropriate for a 3 year old and use simple punctuation."
-    )
+    story_prompt = make_story_prompt(info)
     print("="*50)
     print("GENERATED STORY PROMPT:")
     print("="*50)
@@ -161,61 +157,27 @@ def main(
     cover_path = img_dir / "cover.jpg"
     print("[2/7] Generating cover image...")
     # Generate cover image description
-    cover_prompt = (
-        f"Create a cover image for a children's book titled '{info['title']}'. "
-        f"The book is about: {info['topic']}. The cover illustration should reflect this subject. "
-        f"The story is: {story_text}. "
-        f"Style: {info['style']}. The style, characters, and objects must remain consistent throughout the book. "
-        f"The images have to be square no matter what as it will go on a 8.5x8.5 children's book cover."
-        f"no letters ever touch or overflow the edge. "
-        f"LOCKED: main character appearance."
-    )
+    cover_prompt = make_cover_prompt(info, story_text)
     generate_image(cover_prompt, cover_path, client, reference_image=cover_reference)
 
     # Handle back cover image generation
     back_cover_path = img_dir / "back.jpg"
     print("[3/7] Generating back cover image...")
-    back_cover_prompt = (
-        f"Create a square illustration of the main element from the children's book titled '{info['title']}'. "
-        f"The main element may be the main character or a central object, as appropriate for the story. "
-        f"The image should be visually appealing, centered, and match the style and theme of the book. "
-        f"Style: {info['style']}. The image must be square as if it will go on a 8.5x8.5 children's book back cover. "
-        f"Do not include any letters or text."
-    )
+    back_cover_prompt = make_back_cover_prompt(info)
     generate_image(back_cover_prompt, back_cover_path, client, reference_image=cover_path)
 
     # Handle title page generation
     title_page_path = img_dir / "page1.jpg"
     print("[4/7] Generating title page...")
     print("    Generating title page image...")
-    title_page_prompt = (
-        f"Create a title page illustration for the children's book '{info['title']}'. "
-        f"This is page 1 - a simple, elegant title page. "
-        f"Show the main subject/character from the story in the center of the image. "
-        f"Below the main subject, include the book title '{info['title']}' in large, clear text. "
-        f"Use the same style as the cover: {info['style']}. "
-        f"The style and main character appearance must remain consistent with the cover. "
-        f"The image must be square as if it will go in a 8.5x8.5 children's book page. "
-        f"Make it clean and simple - just the main subject and title text. "
-        f"Using the provided reference image, maintain visual continuity for the main character."
-    )
+    title_page_prompt = make_title_page_prompt(info)
     generate_image(title_page_prompt, title_page_path, client, reference_image=cover_path)
     
     # Handle story page images generation (always regenerate)
     print("[5/7] Generating story page images...")
     for i, page_text in enumerate(pages, start=1):
         print(f"    Generating page {i+1} image...")
-        page_prompt = (
-            f"Create an illustration for page {i+1} of the book '{info['title']}'. "
-            f"Use the same style as the cover. {info['style']} "
-            f"The style, characters, and objects must remain consistent throughout the book. "
-            f"The image must be square as if it will go in a 8.5x8.5 children's book page. "
-            f"no letters ever touch or overflow the edge. "
-            f"LOCKED: main character appearance. Using the provided reference image, maintain visual continuity. "
-            f"The text for this page is: {page_text}"
-            f"Please DON'T include any text in the image. as this it printed on a different page."
-            f"Also make the images different from each other so keep the style and characters consistent but use different poses, backgrounds, and objects."
-        )
+        page_prompt = make_page_prompt(info, i, page_text)
         generate_image(page_prompt, img_dir / f"page{i+1}.jpg", client, reference_image=cover_path)
 
     print(f"[6/7] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
