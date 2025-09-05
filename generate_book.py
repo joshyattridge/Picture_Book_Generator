@@ -7,6 +7,7 @@ import json
 from openai import OpenAI
 # PIL not required here anymore; demo image gen lives in demo_client.py
 from build_book import generate_book as build_pdf
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from prompts import (
     make_story_prompt,
     make_cover_prompt,
@@ -160,26 +161,59 @@ def main(
     cover_prompt = make_cover_prompt(info, story_text)
     generate_image(cover_prompt, cover_path, client, reference_image=cover_reference)
 
-    # Handle back cover image generation
+    # Generate title page, back cover, and story page images in parallel
     back_cover_path = img_dir / "back.jpg"
-    print("[3/7] Generating back cover image...")
-    back_cover_prompt = make_back_cover_prompt(info)
-    generate_image(back_cover_prompt, back_cover_path, client, reference_image=cover_path)
-
-    # Handle title page generation
     title_page_path = img_dir / "page1.jpg"
-    print("[4/7] Generating title page...")
-    print("    Generating title page image...")
-    title_page_prompt = make_title_page_prompt(info)
-    generate_image(title_page_prompt, title_page_path, client, reference_image=cover_path)
-    
-    # Handle story page images generation
-    print("[5/7] Generating story page images...")
-    for i, page_text in enumerate(pages, start=1):
-        print(f"    Generating page {i+1} image...")
-        page_prompt = make_page_prompt(info, i, page_text)
-        generate_image(page_prompt, img_dir / f"page{i+1}.jpg", client, reference_image=cover_path)
-        print(f"    Page {i+1} image generated.")
+    print("[3/7] Generating images (title, back cover, and story pages)...")
+    max_workers = min(8, (len(pages) if pages else 0) + 2)
+    if max_workers <= 0:
+        print("    No pages to illustrate.")
+    else:
+        futures = {}
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Queue title page
+            print("    Generating title page image...")
+            title_page_prompt = make_title_page_prompt(info)
+            fut_title = executor.submit(
+                generate_image, title_page_prompt, title_page_path, client, cover_path
+            )
+            futures[fut_title] = ("title", None)
+
+            # Queue back cover
+            print("    Generating back cover image...")
+            back_cover_prompt = make_back_cover_prompt(info)
+            fut_back = executor.submit(
+                generate_image, back_cover_prompt, back_cover_path, client, cover_path
+            )
+            futures[fut_back] = ("back", None)
+
+            # Queue story pages (starting from page 2)
+            for i, page_text in enumerate(pages, start=1):
+                print(f"    Generating page {i+1} image...")
+                page_prompt = make_page_prompt(info, i, page_text)
+                out_path = img_dir / f"page{i+1}.jpg"
+                fut = executor.submit(generate_image, page_prompt, out_path, client, cover_path)
+                futures[fut] = ("page", i)
+
+            # Handle completions
+            for fut in as_completed(futures):
+                kind, idx = futures[fut]
+                try:
+                    fut.result()
+                except SystemExit:
+                    # Propagate fail-fast behavior if any image generation fails
+                    raise
+                except Exception as exc:
+                    if kind == "page":
+                        print(f"    Page {idx+1} image failed: {exc}")
+                    else:
+                        print(f"    {kind.capitalize()} image failed: {exc}")
+                    raise SystemExit(1)
+                else:
+                    if kind == "page":
+                        print(f"    Page {idx+1} image generated.")
+                    else:
+                        print(f"    {kind.capitalize()} image generated.")
 
     print(f"[6/7] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
 
