@@ -9,6 +9,8 @@ from openai import OpenAI
 from PIL import Image, ImageDraw, ImageFont
 from build_book import generate_book as build_pdf
 
+from demo_client import DemoOpenAI
+
 
 def log_token_usage(token_file: Path, request_name: str, input_tokens: int, output_tokens: int) -> None:
     """Append token usage information to a file and echo to console."""
@@ -206,8 +208,10 @@ def chat_completion(messages, client, token_file: Path, request_name: str, model
     return response.choices[0].message.content.strip()
 
 
-def main(cover_reference: Optional[Path] = None) -> None:
+def main(cover_reference: Optional[Path] = None, demo: bool = False) -> None:
     print("\n========== Picture Book Generator ==========")
+    if demo:
+        print("[DEMO MODE] Using local demo responses and images. No API calls.")
     info, regenerate_text, regenerate_images = prompt_user()
 
     # Directory setup
@@ -218,8 +222,11 @@ def main(cover_reference: Optional[Path] = None) -> None:
     token_file = book_dir / "token_record.txt"
     token_file.write_text("request_name\tinput_tokens\toutput_tokens\n", encoding="utf-8")
 
-    api_key = get_api_key()
-    client = OpenAI(api_key=api_key, http_client=httpx.Client())
+    if demo:
+        client = DemoOpenAI()
+    else:
+        api_key = get_api_key()
+        client = OpenAI(api_key=api_key, http_client=httpx.Client())
 
     # Start persistent chat
     messages = [
@@ -472,9 +479,15 @@ if __name__ == "__main__":
         type=Path,
         help="Path to an image used as a reference for the cover",
     )
+    parser.add_argument(
+        "--demo",
+        "-demo",
+        action="store_true",
+        help="Run in demo mode using local placeholder text and images (no API).",
+    )
     args = parser.parse_args()
     ref_img = args.cover_reference
     if ref_img and not ref_img.exists():
         print(f"Reference image {ref_img} not found. Continuing without it.")
         ref_img = None
-    main(ref_img)
+    main(ref_img, demo=args.demo)
