@@ -1,4 +1,3 @@
-import os
 import argparse
 from pathlib import Path
 from typing import Optional
@@ -43,20 +42,6 @@ def generate_image(
     except Exception as exc:
         print(f"Image generation failed: {exc}.")
         raise SystemExit(1)
-
-
-# Removed load_or_collect_info: no loading/saving previous entries.
-
-
-def get_api_key(cli_key: Optional[str]) -> str:
-    """Require API key via CLI; no file or env fallback."""
-    if not cli_key:
-        raise SystemExit("Missing --api-key (required unless running with --demo).")
-    return cli_key.strip()
-
-
-# Removed save_placeholder_image: on image generation failure the program exits.
-
 
 def chat_completion(messages, client, model="gpt-4.1"):
     response = client.chat.completions.create(
@@ -114,8 +99,9 @@ def main(
     if demo:
         client = DemoOpenAI()
     else:
-        key = get_api_key(api_key)
-        client = OpenAI(api_key=key, http_client=httpx.Client())
+        if not api_key:
+            raise SystemExit("Missing --api-key (required unless running with --demo).")
+        client = OpenAI(api_key=api_key.strip(), http_client=httpx.Client())
 
     # Start persistent chat
     messages = [
@@ -264,10 +250,6 @@ if __name__ == "__main__":
         help="Type of book: e.g., 'story' or 'rhyme' (free text)",
     )
     parser.add_argument("--style", type=str, help="Preferred illustration style (free text)")
-
-    # Always regenerate content each run; no reuse flags
-
-    # Demo and API
     parser.add_argument(
         "--cover-reference",
         type=Path,
@@ -284,8 +266,6 @@ if __name__ == "__main__":
         type=str,
         help="OpenAI API key (required unless --demo is used).",
     )
-
-    # No regeneration flags
 
     args = parser.parse_args()
 
