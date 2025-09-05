@@ -173,12 +173,13 @@ def main(
     title_page_prompt = make_title_page_prompt(info)
     generate_image(title_page_prompt, title_page_path, client, reference_image=cover_path)
     
-    # Handle story page images generation (always regenerate)
+    # Handle story page images generation
     print("[5/7] Generating story page images...")
     for i, page_text in enumerate(pages, start=1):
         print(f"    Generating page {i+1} image...")
         page_prompt = make_page_prompt(info, i, page_text)
         generate_image(page_prompt, img_dir / f"page{i+1}.jpg", client, reference_image=cover_path)
+        print(f"    Page {i+1} image generated.")
 
     print(f"[6/7] Book generation complete!\n  Book directory: {book_dir}\n  Images directory: {img_dir}\n  Story text: {book_dir / 'book_text.txt'}\n")
 
