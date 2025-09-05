@@ -23,6 +23,7 @@ def generate_image(
     out_path: Path,
     client: OpenAI,
     reference_image: Optional[Path] = None,
+    image_model: str = "gpt-image-1",
 ) -> None:
     """Generate an image using gpt-image-1, falling back to a placeholder."""
 
@@ -32,7 +33,7 @@ def generate_image(
                 resp = client.images.edit(
                     image=rf,
                     prompt=prompt,
-                    model="gpt-image-1",
+                    model=image_model,
                     output_format="jpeg",
                     input_fidelity="high",
                     user="picture-book-generator",
@@ -40,7 +41,7 @@ def generate_image(
         else:
             resp = client.images.generate(
                 prompt=prompt,
-                model="gpt-image-1",
+                model=image_model,
                 output_format="jpeg",
                 user="picture-book-generator",
             )
@@ -51,7 +52,7 @@ def generate_image(
         print(f"Image generation failed: {exc}.")
         raise SystemExit(1)
 
-def chat_completion(messages, client, model="gpt-4.1"):
+def chat_completion(messages, client, model: str = "gpt-4.1"):
     response = client.chat.completions.create(
         model=model,
         messages=messages,
@@ -68,6 +69,8 @@ def main(
     book_type: Optional[str] = None,
     style: Optional[str] = None,
     api_key: Optional[str] = None,
+    text_model: str = "gpt-4.1",
+    image_model: str = "gpt-image-1",
 ) -> None:
     print("\n========== Picture Book Generator ==========")
     if demo:
@@ -129,7 +132,7 @@ def main(
     attempt = 1
     while True:
         messages.append({"role": "user", "content": story_prompt})
-        story_text = chat_completion(messages, client)
+        story_text = chat_completion(messages, client, model=text_model)
         pages = [p.strip() for p in story_text.split("\n\n") if p.strip()]
         if len(pages) == info['pages']:
             break
@@ -159,7 +162,7 @@ def main(
     print("[2/7] Generating cover image...")
     # Generate cover image description
     cover_prompt = make_cover_prompt(info, story_text)
-    generate_image(cover_prompt, cover_path, client, reference_image=cover_reference)
+    generate_image(cover_prompt, cover_path, client, reference_image=cover_reference, image_model=image_model)
 
     # Generate title page, back cover, and story page images in parallel
     back_cover_path = img_dir / "back.jpg"
@@ -175,7 +178,7 @@ def main(
             print("    Generating title page image...")
             title_page_prompt = make_title_page_prompt(info)
             fut_title = executor.submit(
-                generate_image, title_page_prompt, title_page_path, client, cover_path
+                generate_image, title_page_prompt, title_page_path, client, cover_path, image_model
             )
             futures[fut_title] = ("title", None)
 
@@ -183,7 +186,7 @@ def main(
             print("    Generating back cover image...")
             back_cover_prompt = make_back_cover_prompt(info)
             fut_back = executor.submit(
-                generate_image, back_cover_prompt, back_cover_path, client, cover_path
+                generate_image, back_cover_prompt, back_cover_path, client, cover_path, image_model
             )
             futures[fut_back] = ("back", None)
 
@@ -192,7 +195,7 @@ def main(
                 print(f"    Generating page {i+1} image...")
                 page_prompt = make_page_prompt(info, i, page_text)
                 out_path = img_dir / f"page{i+1}.jpg"
-                fut = executor.submit(generate_image, page_prompt, out_path, client, cover_path)
+                fut = executor.submit(generate_image, page_prompt, out_path, client, cover_path, image_model)
                 futures[fut] = ("page", i)
 
             # Handle completions
@@ -263,6 +266,24 @@ if __name__ == "__main__":
         type=str,
         help="OpenAI API key (required unless --demo is used).",
     )
+    parser.add_argument(
+        "--text-model",
+        type=str,
+        default="gpt-4.1",
+        help=(
+            "Model for story text (default: gpt-4.1). "
+            "Cheapest testing option: gpt-4o-mini. High quality: gpt-4.1."
+        ),
+    )
+    parser.add_argument(
+        "--image-model",
+        type=str,
+        default="gpt-image-1",
+        help=(
+            "Model for image generation (default: gpt-image-1). "
+            "Use demo mode for zero-cost testing."
+        ),
+    )
 
     args = parser.parse_args()
 
@@ -284,4 +305,6 @@ if __name__ == "__main__":
         book_type=args.book_type,
         style=args.style,
         api_key=args.api_key,
+        text_model=args.text_model,
+        image_model=args.image_model,
     )
