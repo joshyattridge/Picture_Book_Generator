@@ -1,67 +1,76 @@
-# Children's Book PDF Generator
+# Children's Picture Book Generator
 
-This project is a simple PDF children's book generator. It allows you to provide a list of text paragraphs and images, and generates a PDF where each page contains one paragraph and one image. The generated PDF is formatted for an 8.5×8.5 inch book at **300 dpi**, making it suitable for uploading to Kindle Direct Publishing (KDP).
-
-## Features
-
-- Generate a children's book PDF with one paragraph and one image per page
-- Accepts lists of text and images as input
-- Outputs a PDF sized for KDP (8.5x8.5 inches)
-- Uses [Pillow](https://python-pillow.org/) for image processing
-- Uses [pdfplumber](https://github.com/jsvine/pdfplumber) for PDF manipulation (if needed)
-- Includes example text and images for testing
+Generate a fully illustrated children's book with text and images, then build print‑ready PDFs sized for 8.5×8.5 inches at 300 dpi (KDP‑friendly).
 
 ## Requirements
 
-- Python 3.7+
-- [Pillow](https://python-pillow.org/)
-- [pdfplumber](https://github.com/jsvine/pdfplumber)
-- [OpenAI](https://github.com/openai/openai-python)
-- [httpx](https://github.com/encode/httpx)
+- Python 3.9+
+- `pip install -r requirements.txt`
+  - Pillow
+  - pdfplumber
+  - openai
+  - httpx
 
-Install dependencies with:
+## What It Does
 
-```bash
-pip install -r requirements.txt
-```
+- Creates a book folder under `books/<Title_Slug>/` containing:
+  - `book_text.txt` — final accepted story text
+  - `images/cover.jpg`, `images/back.jpg`, `images/page1.jpg..pageN.jpg`
+  - `cover.pdf` and `manuscript.pdf` (final PDFs)
+- Always regenerates story text and all images each run.
+- Asks once if you accept the generated story; if not, exits immediately.
+- Fails fast if any image generation fails (no placeholder images).
+- Supports a demo mode with offline, local placeholder outputs.
 
-## Usage
+## CLI Usage
 
-1. Prepare a list of text paragraphs (one for each page).
-2. Prepare a list of image file paths (one for each page).
-3. Run the script to generate the PDF.
+The generator is fully CLI‑driven — no saved prompts or reuse.
 
-Example usage:
+- Demo mode (no API key required):
 
-```python
-from book_generator import generate_book
+  ```bash
+  python generate_book.py \
+    --demo \
+    --title "Space Cats" \
+    --topic "Cats exploring outer space" \
+    --pages 12 \
+    --book-type story \
+    --style "cute watercolor" \
+    --cover-reference path/to/reference.jpg  # optional
+  ```
 
-texts = [
-    "Once upon a time, there was a little fox who loved to explore the forest.",
-    "One sunny day, the fox found a sparkling river and made new friends.",
-    "At night, the stars twinkled above as the fox dreamed of new adventures."
-]
+- Real mode (API key required):
 
-images = [
-    "images/fox.png",
-    "images/river.png",
-    "images/stars.png"
-]
+  ```bash
+  python generate_book.py \
+    --api-key sk-... \
+    --title "Forest Friends" \
+    --topic "Woodland animal adventures" \
+    --pages 12 \
+    --book-type rhyme \
+    --style "bright, cartoon style"
+  ```
 
-generate_book(texts, images, output_pdf="childrens_book.pdf")
-```
+### Arguments
 
-### Command line usage
+- `--title`: Book title (used to name the output directory)
+- `--topic`: Short description of what the book is about
+- `--pages`: Number of story pages (minimum 12)
+- `--book-type`: Style of writing, e.g. `story` or `rhyme`
+- `--style`: Illustration style (free text)
+- `--cover-reference`: Optional path to an image used to guide visual consistency
+- `--demo` / `-demo`: Run offline with local demo text and images
+- `--api-key`: OpenAI API key (required unless `--demo` is used)
 
-Use `generate_book.py` to interactively create a new picture book. You can
-optionally supply an existing image to guide the cover art, and the resulting
-cover will be used as a reference for the rest of the illustrations:
+Notes:
+- The script prints the full generated story and asks for acceptance:
+  - Enter yes/y (or press Enter) to continue and save it
+  - Any other answer exits without saving or generating images
+- Each run regenerates everything; there is no reuse mode.
 
-```bash
-python generate_book.py --cover-reference my_photo.jpg
-```
+## Building PDFs Only
 
-To turn prepared book folders in `books/` into PDFs, use `build_book.py`:
+You can rebuild PDFs for existing book folders with `build_book.py`:
 
 ```bash
 python build_book.py                  # generate PDFs for all books
@@ -71,21 +80,11 @@ python build_book.py --book Peters_Pickle --skip-cover    # no cover PDF
 python build_book.py --book Peters_Pickle -o build        # custom output dir
 ```
 
-## Example Content
+## Output Format and KDP
 
-- Example text and images are included in the repository for testing.
-- The script will generate a PDF named `childrens_book.pdf` with three pages, each containing a paragraph and an image.
-
-## KDP Compatibility
-
-- The generated PDFs use 300 dpi pages measuring 8.5×8.5 inches.
-- Interior pages can include bleed when the ``USE_BLEED`` constant in
-  ``generate_book.py`` is set to ``True``. This expands the page size to
-  8.625×8.75 inches as recommended by KDP.
-- Cover images are automatically expanded to include bleed. The back panel is on the left and the front panel on the right of the PDF spread.
-- Spine text is added when the book has 100 pages or more, but the script does **not** overlay the title on the front cover image.
-- Font sizes are scaled for 300 dpi pages so text remains clear when printed.
-- Please review KDP's latest guidelines for any additional requirements before uploading.
+- PDFs are 8.5×8.5 inches at 300 dpi, suitable for KDP.
+- Cover and back cover JPGs are generated and then compiled into PDFs.
+- Review KDP’s latest specs before uploading.
 
 ## License
 
