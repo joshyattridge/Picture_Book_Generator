@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Optional
 import httpx
 import base64
-import json
 from openai import OpenAI
 # PIL not required here anymore; demo image gen lives in demo_client.py
 from build_book import generate_book as build_pdf
